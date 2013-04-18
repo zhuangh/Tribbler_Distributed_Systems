@@ -36,6 +36,9 @@ class TribblerHandler : virtual public TribblerIf {
   TribbleStatus::type CreateUser(const std::string& userid) {
     // Your implementation goes here
     printf("CreateUser\n");
+    printf("But Failed Now\n");
+    // Get(userid)
+
     return TribbleStatus::NOT_IMPLEMENTED;
   }
 
@@ -53,6 +56,7 @@ class TribblerHandler : virtual public TribblerIf {
 
   TribbleStatus::type PostTribble(const std::string& userid, const std::string& tribbleContents) {
     // Your implementation goes here
+
     printf("PostTribble\n");
     return TribbleStatus::NOT_IMPLEMENTED;
   }
