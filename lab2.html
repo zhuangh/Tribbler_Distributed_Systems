@@ -1,0 +1,109 @@
+Lab 2: Tribbler 
+Due: 11am, Thursday, April 23rd, 2013
+Overview
+
+In this project, you will build an information dissemination service, called Tribbler. Clients of Tribbler can post short messages (called tribbles), and subscribe to receive other users messages. It’s entirely possible that Tribbler resembles a popular online service whose mascot is a small tweeting bird. Your system will use a fairly classic three-tier architecture. For lab 2, you will be implementing the Tribble Server that interacts between the Tribbler client and the backend storage server.
+Client: The sample client application (or anything you choose to write) is the ﬁrst tier (in a real application, it might be running as part of a web service). All it knows how to do is parse commands, send them to the service, and print out results.
+Tribbler Server: The Tribbler server implements the application logic that make “Tribbler” different from other applications. Commands like “subscribe to”, and “get a list of all tribbles from users I subscribe to” are implemented here.
+Storage system: The storage system provides a key-value storage service (much like a hash table). For lab 2, we've provided you with a backend storage server that your stateless Tribbler server can interact with.
+Basic Tribbling
+
+For lab 2, you will implement an RPC (Remote Procedure Calls) based Tribbler server that supports the full set of functionality: Subscribing to users, unsubscribing, posting, listing posts, etc. How you choose to structure this internally is up to you: We will test only the external behavior in response to RPC messages.
+
+We will cover RPC in more detail in the lecture on Thursday (04/18) but at a very high level Remote Procedure Calls allow a client to invoke a procedure on a remote server just like a method call in the same address space. Since the procedure call needs to be executed on a remote server, you need code that will send out the request and the arguments over the network in a format that the remote server can understand, make the procedure call on the passed arguments and then return the response over the network in a format that can be parsed by the client. The starter code handles passing the arguments and response, all you need to to do is implement the actual logic of the RPC call that gets invoked.
+
+Tribbler Client-Server Interface
+
+Clients will interact with the Tribbler service using Apache Thrift RPC calls. We've specified the RPC interface between the client and the server in the file Tribbler.thrift. It has a list of the RPC services that the Tribbler server offers the client, along with the data types that the server and client use to interact. For instance, while a Tribble posted by a user is only a string message, the server internally stores the tribble as the following string.
+struct Tribble {
+    Userid string // user who posted the Tribble
+    Posted int64 // Posting time
+    Contents string
+}
+The Post operation used by the client takes only a username and a string. Your server should create the Tribble struct and timestamp it. How you choose to store the list of tribbles associated with a user is up to you, but we suggest taking advantage of the backend storage command provided to the Tribbler server. The RPC services offered to the Tribbler server by the storage backend is described in the next section. For instance, you could use the AddToList command (explained below) provided by the storage backend to store a user's tribble. Your Tribbler server needs to implement the following RPC methods in order to interact with the client.
+Creating users Before a userid can either subscribe, add tribbles, or be subscribed to, it must ﬁrst be created.
+
+CreateUser(Userid string) returns TribbleStatus
+TribbleStatus is simply an enumerated data type that denotes where the RPC status (whether it failed, succeeded). Each userid is denoted in the string. When the server receives the CreateUser request, it needs to store the userid in a storage backend. The interface between the server and the storage backend is described in the next section. Note that there is no interface to delete users. A userid can never be re-used.
+Manipulating the social graph Users can subscribe or unsubscribe to another user’s tribbles using these functions:
+
+AddSubscription(userid string, subscribeto string) returns TribbleStatus 
+RemoveSubscription(userid string, subscribeto string) returns TribbleStatus.
+Your server should not allow a user to subscribe to a nonexistent user ID, nor allow a nonexistent user ID to subscribe to anyone. Remember, though, that user IDs can never be deleted – so if you test that a user ID is valid, it will be valid forever. So don’t worry about race conditions such as validating the user and then adding the subscription—the user will still be valid.
+Observing the social graph This function lists the users to whom the target user subscribes:
+
+GetSubscriptions(Userid string) returns SubscriptionResponse
+struct SubscriptionResponse {
+    TribbleStatus status
+    string[] subscriptions
+}
+Again, your should make sure you do not report subscriptions for nonexistent userID.
+Posting Tribbles The client interface to posting a tribble provides only the contents. The server is responsible for timestampping the entry and creating a Tribble struct. You should not allow nonexistent user IDs to post or read tribbes.
+PostTribble(Userid string, TribbleContents string) status TribbleStatus
+Reading Tribbles The most basic function retrieves a list of the most recent tribbles by a particular user, in reverse chronological order, up to a maximum of 100 entries, in reverse chronological order (most recent ﬁrst): The other function retrieves all tribbles from all users to which a particular user is subscribed, up to a maximum of 100, in reverse chronological order (most recent ﬁrst):
+GetTribbles(Userid string) returns TribbleResponse
+GetTribblesBySubscription(Userid string) returns TribbleResponse
+struct TribbleResponse {
+    TribbleStatus stats
+    Tribble[] tribbles
+}
+Since our TribblerServer is a stateless server, that only implements the application logic, each client request triggers another RPC call by the Tribbler server to the storage back-end server to store and retrieve the required data from the data store. For lab 2, you have to implement the application logic in the Tribbler server and how it translates the client RPC calls to storage RPC calls to the storage server. The storage server is implemented as a key value store and we now describe the interface between the Tribbler server and the storage back-end.
+
+Tribbler Server-Storage Backend Interface
+
+The RPC services offered by backend storage are listed in KeyValueStore.thrift. The backend storage has been implemented as a simple key-value store. Conventional key-value store offer a GET and PUT interface, where a client a store a value for a particular key using the PUT command and then obtain the value associated with a key using the GET command. The storage back-end that we've provided offers a few additional services. We will talk about Key Value stores in more detail in upcoming lectures.
+Get(key string) returns GetResponse
+Put(key string, value string) returns KVStoreStatus
+GetList(key string) returns GetListResponse
+AddToList(key string, value string) returns KVStoreStatus
+RemoveFromList(key string, value string) returns KVStoreStatus
+struct GetResponse {
+    KVStoreStatus status
+    string value
+}
+struct GetListResponse {
+    KVStoreStatus status
+    string[] values
+}
+KVStoreStatus is an enumerated data type that denotes the return status of the RPC. 
+NOTE: Always make sure to check the status of your RPC request. Everytime the Tribbler server makes a request to the storage server, it should check that the user id provided by the client are valid by checking the return value of the RPC made to the storage server and then return appropriate response to the client.
+
+Since you'll be implementing the application logic in the Tribbler server, it is entirely up to you to decide how to translate Tribbler client requests to requests to the backend store at the Tribbler server, what keys to use etc. A good implementation will not store a gigantic list of all tribbles for a user in a single key-value entry. Your system should be able to handle users with 1000s of tribbles without excessive bloat or slowdown. We suggest storing a list of tribble IDs in some way, and then storing each tribble as a separate key-value item stored on the same partition as the user ID. Also note that the key and value are both of data type strings. In order to store your tribble struct in the backend storage, you will need to serialize the struct data type into a string and deserialize the stored value to obtain the struct filed. One way to do this to represent your struct fields in JSON like strings.
+
+Getting started
+
+You'll be using the following machines in the cluster to run your Tribbler server and the client. The starter code for lab2 has been provided:
+/classes/cse223b/sp13/labs/lab2/lab2.tar.gz
+Starting Tribbler Server: Copy the lab2.tar.gz to a personal directory and then navigate to that directory. You can start the Tribbler server using the following commands:
+export LD_LIBRARY_PATH=/usr/local/lib (You can add also this to your ~/.bashrc or ~/.bash_profile to avoid doing it again)
+tar xzvf lab2.tar.gz
+cd lab2/src
+make
+./tribbler_server sysnet89.sysnet.ucsd.edu 7070 PORTNO#
+sysnet89.sysnet.ucsd.edu:7070 is where the backend storage server is running. PORTNO# is the port on which your Tribbler server listens on for client connection. You should change PORTNO to another port number to avoid conflicts with server run by other students. The Tribbler server code has wrapper functions for Get, Put, GetList etc. that will invoke the RPC on the backend storage server. It is possible that when you start your server you see the following error:
+Thrift: Thu Apr 11 09:49:33 2013 TServerSocket::listen() BIND 9090
+terminate called after throwing an instance of
+'apache::thrift::transport::TTransportException'
+  what():  Could not bind: Transport endpoint is not connected
+Aborted
+This means that the PORTNO# you chose for your Tribbler server is already being used and you should restart your server on another Psee the following error, it means that the PORTNO# you chose for your Tribbler server is already being used and you should restart your server on another PORT#.
+Starting Tribbler Client: The Tribbler server you started has RPC stubs that need to be implemented. To test your server, we have also provided a sample Tribbler client. While we are providing a sample Tribbler client, you should write your own (or modify ours) for testing the different usecases for your Tribbler server. Navigate to lab2/src folder and run the following commands to start your Tribbler client.
+
+make
+./tribbler_client localhost PORTNO#
+If you started your tribbler_server on another host/port in the cluster, replace localhost by the hostname of the machine and the port by the right port number for your server. The Tribbler client creates three users, sends subscribiption requests, post/reads tribbles.
+Tribbler Client in Browser: We have a browser based Tribbler client running on sysnet89 that talks to a sample Tribbler server. You can access the browser based Tribbler client by typing the following url in your browser:
+
+http://sysnet89.sysnet.ucsd.edu/webserver/?userid=malveeka
+I will you provide the code for web browser based Tribbler client (it's still under beta!) so that you can connect it with your Tribbler server and view the tribbles posted and subscriptions of the different users on your Tribbler service.
+Deliverables
+
+You will be turning in the source folder that contains your implementation of the Tribbler_server.cpp. To submit your code to the submission directory, navigate to lab2/src folder and run the following commands.
+make turnin
+This command will create a file called user-turnin.tgz, where user is your user ID, and copy it to the submission directory. make sure that all the files I need to compile your code are in this directory. It's a good idea to include a README.txt explaining your code, bugs etc.. Do not modify the Makefile to link in code outside of the working directory
+To verify your tarball contains all the right thing, run the following commands.
+mkdir tmp
+cd tmp
+tar xzvf ../$USER-turnin.tgz
+make
+Last updated: Thu Apr 11 10:13:18 -0700 2013 [validate xhtml]
