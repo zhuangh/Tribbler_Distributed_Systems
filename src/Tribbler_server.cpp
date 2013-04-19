@@ -37,19 +37,21 @@ class TribblerHandler : virtual public TribblerIf {
     // Your implementation goes here
     printf("CreateUser\n");
     string uList = "USER_LIST";
-    // KeyValueStore::GetResponse res = AddToList(uList,userid);
-    KeyValueStore::type res = AddToList(uList,userid);
-    //    string vID = "000"; 
     string uID = userid;
+    // KeyValueStore::GetResponse res = AddToList(uList,userid);
+    KVStoreStatus::type st = AddToList(uList,userid);
+    //    string vID = "000"; 
     // EKEYNOTFOUND = 2,
-    printf("res.status = %d\n",res.status);
+    printf("KV st = %d\n",st);
 
-    if (res.status == KVStoreStatus::EKEYNOTFOUND ) // duplicate in lists
+    if (st == KVStoreStatus::EITEMNOTFOUND
+//	EKEYNOTFOUND 
+	) // duplicate in lists
     {
-	AddToList(uList, uID);
-	KeyValueStore::GetResponse res = Get(uID);
-	printf("after creating, check it = %d\n", res.status);
-	printf("Create with New cool name! \n");
+//	AddToList(uList, uID);
+// 	KeyValueStore::GetResponse res = Get(uID);
+	printf("after creating, check it = %d\n", st);
+	printf("Created with New cool name for you! \n");
 	return TribbleStatus::OK;
     }
     else{
