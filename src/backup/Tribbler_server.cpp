@@ -36,25 +36,18 @@ class TribblerHandler : virtual public TribblerIf {
   TribbleStatus::type CreateUser(const std::string& userid) {
     // Your implementation goes here
     printf("CreateUser\n");
-    string uList = "USER_LIST";
-    // KeyValueStore::GetResponse res = AddToList(uList,userid);
-    KeyValueStore::type res = AddToList(uList,userid);
-    //    string vID = "000"; 
-    string uID = userid;
-    // EKEYNOTFOUND = 2,
-    printf("res.status = %d\n",res.status);
+    KeyValueStore::GetResponse res = Get(userid);
 
-    if (res.status == KVStoreStatus::EKEYNOTFOUND ) // duplicate in lists
+    printf("Create with New cool name! \n");
+
+    if (res.status == KVStoreStatus::EITEMEXISTS ) // duplicate in lists
     {
-	AddToList(uList, uID);
-	KeyValueStore::GetResponse res = Get(uID);
-	printf("after creating, check it = %d\n", res.status);
-	printf("Create with New cool name! \n");
-	return TribbleStatus::OK;
+	printf("User Name Already Used. Create with New cool name! \n");
+	return TribbleStatus::EEXISTS;
     }
     else{
-	printf("User Name Already Used. Create with New cool name! \n");
-	return TribbleStatus::EEXISTS ;
+	AddToList(userid);
+	return TribbleStatus::OK;
     }
   }
 

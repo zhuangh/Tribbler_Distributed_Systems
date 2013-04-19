@@ -36,26 +36,7 @@ class TribblerHandler : virtual public TribblerIf {
   TribbleStatus::type CreateUser(const std::string& userid) {
     // Your implementation goes here
     printf("CreateUser\n");
-    string uList = "USER_LIST";
-    // KeyValueStore::GetResponse res = AddToList(uList,userid);
-    KeyValueStore::type res = AddToList(uList,userid);
-    //    string vID = "000"; 
-    string uID = userid;
-    // EKEYNOTFOUND = 2,
-    printf("res.status = %d\n",res.status);
-
-    if (res.status == KVStoreStatus::EKEYNOTFOUND ) // duplicate in lists
-    {
-	AddToList(uList, uID);
-	KeyValueStore::GetResponse res = Get(uID);
-	printf("after creating, check it = %d\n", res.status);
-	printf("Create with New cool name! \n");
-	return TribbleStatus::OK;
-    }
-    else{
-	printf("User Name Already Used. Create with New cool name! \n");
-	return TribbleStatus::EEXISTS ;
-    }
+    return TribbleStatus::NOT_IMPLEMENTED;
   }
 
   TribbleStatus::type AddSubscription(const std::string& userid, const std::string& subscribeto) {
@@ -72,7 +53,6 @@ class TribblerHandler : virtual public TribblerIf {
 
   TribbleStatus::type PostTribble(const std::string& userid, const std::string& tribbleContents) {
     // Your implementation goes here
-
     printf("PostTribble\n");
     return TribbleStatus::NOT_IMPLEMENTED;
   }
@@ -138,17 +118,13 @@ class TribblerHandler : virtual public TribblerIf {
   KeyValueStore::GetResponse Get(std::string key) {
     KeyValueStore::GetResponse response;
     // Making the RPC Call to the Storage server
-    //
-    printf("In the Get... \n");
     boost::shared_ptr<TSocket> socket(new TSocket(_storageServer, _storageServerPort));
     boost::shared_ptr<TTransport> transport(new TBufferedTransport(socket));
     boost::shared_ptr<TProtocol> protocol(new TBinaryProtocol(transport));
     KeyValueStoreClient client(protocol);
     transport->open();
-    printf("Open Transport... \n");
     client.Get(response, key);
     transport->close();
-    printf("Close Transport... \n");
     return response;
   }
 
