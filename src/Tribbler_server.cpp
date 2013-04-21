@@ -12,6 +12,7 @@
 #include <thrift/server/TSimpleServer.h>
 #include <thrift/transport/TServerSocket.h>
 #include <thrift/transport/TBufferTransports.h>
+#include <boost/lexical_cast.hpp>
 
 using namespace ::apache::thrift;
 using namespace ::apache::thrift::protocol;
@@ -19,6 +20,7 @@ using namespace ::apache::thrift::transport;
 using namespace ::apache::thrift::server;
 
 using boost::shared_ptr;
+using boost::lexical_cast;
 
 using namespace std;
 using namespace  ::Tribbler;
@@ -44,14 +46,9 @@ class TribblerHandler : virtual public TribblerIf {
     // EKEYNOTFOUND = 2,
     printf("KV st = %d\n",st);
 
-    if (st == KVStoreStatus::EITEMNOTFOUND
-//	EKEYNOTFOUND 
-	) // duplicate in lists
-    {
-//	AddToList(uList, uID);
-// 	KeyValueStore::GetResponse res = Get(uID);
+    // if (st == KVStoreStatus::EITEMNOTFOUND){
+    if (st == KVStoreStatus::OK){
 	printf("after creating, check it = %d\n", st);
-	printf("Created with New cool name for you! \n");
 	return TribbleStatus::OK;
     }
     else{
@@ -63,38 +60,153 @@ class TribblerHandler : virtual public TribblerIf {
   TribbleStatus::type AddSubscription(const std::string& userid, const std::string& subscribeto) {
     // Your implementation goes here
     printf("AddSubscription\n");
-    return TribbleStatus::NOT_IMPLEMENTED;
+    // is there the user existed?
+    if(userid == subscribeto ) return TribbleStatus::INVALID_SUBSCRIBETO;
+    string user_list = "USER_LIST";
+
+    KVStoreStatus::type usercheck = AddToList(user_list, subscribeto);
+    if( usercheck == KVStoreStatus::EITEMEXISTS){
+	//	KVStoreStatus::type st =
+	string user_friends = userid+":friends";
+	AddToList(user_friends, subscribeto);
+	printf("%s Add Subscription %s\n", user_friends.c_str(), subscribeto.c_str());
+	////
+	string befriended = subscribeto+ ":befriended"; 
+	AddToList(befriended, userid);
+	////
+	return TribbleStatus::OK;
+
+    }
+    RemoveFromList(user_list, subscribeto);
+    printf("Fail to add a subscription to %s for %s", subscribeto.c_str(), userid.c_str());	
+
+    return TribbleStatus::INVALID_SUBSCRIBETO;
+
+//    KVStoreStatus::type st = AddToList(sub, subscribeto.c_str());
+/*
+    if( st == KVStoreStatus::OK){
+	printf("Add a subscription to %s for %s", subscribeto.c_str(), sub.c_str());	
+	return TribbleStatus::OK;
+    }
+
+    if( st == KVStoreStatus::EITEMEXISTS){
+	printf("Not add a subscription to %s for %s", subscribeto.c_str(), sub.c_str());	
+	return TribbleStatus::OK;
+
+    */
+     // return TribbleStatus::NOT_IMPLEMENTED;
   }
 
   TribbleStatus::type RemoveSubscription(const std::string& userid, const std::string& subscribeto) {
     // Your implementation goes here
     printf("RemoveSubscription\n");
-    return TribbleStatus::NOT_IMPLEMENTED;
+    string sub = userid+":friends";
+//    KVStoreStatus s
+    KVStoreStatus::type st = RemoveFromList(sub, subscribeto.c_str());
+    printf("%s Remove Subscription %s\n",userid.c_str(), sub.c_str());
+    if( st == KVStoreStatus::EITEMEXISTS){
+	printf("Remove a subscription to %s for %s", subscribeto.c_str(), sub.c_str());	
+	return TribbleStatus::OK;
+    }
+    printf("Fail to add a subscription to %s for %s", subscribeto.c_str(), sub.c_str());	
+    return TribbleStatus::OK;
+    // return TribbleStatus::INVALID_SUBSCRIBETO;
+    // return TribbleStatus::NOT_IMPLEMENTED;
   }
 
   TribbleStatus::type PostTribble(const std::string& userid, const std::string& tribbleContents) {
     // Your implementation goes here
-
     printf("PostTribble\n");
-    return TribbleStatus::NOT_IMPLEMENTED;
+    string user_tribbles = userid+":tribble";
+    string timestamp = boost::lexical_cast<string> (time(NULL)); 
+    string time_tribble = timestamp+":"+tribbleContents ;
+    KVStoreStatus::type st = AddToList(user_tribbles, time_tribble);
+    printf("Post status %d\n",st);
+    if(st == KVStoreStatus::OK){
+	printf("%s just post %s\n",user_tribbles.c_str(), tribbleContents.c_str());
+    }
+    // propagate to the people subscribe `me`
+    string befriended = userid + ":befriended"; 
+    KeyValueStore::GetListResponse res =  GetList(befriended);
+    vector<string> bef = res.values;
+    string key ;
+    KVStoreStatus::type st_prop ;
+    string time_tribble_tmp;
+    for(vector<string>::iterator it = bef.begin(); it != bef.end(); it++){
+       key = (*it)+":friends_tweets" ;	
+       time_tribble_tmp = userid+":"+time_tribble;
+       st_prop = AddToList(key,time_tribble_tmp); 
+       printf("%s after propagate to %s, the state %d\n", time_tribble_tmp.c_str() , key.c_str(), st_prop);
+    }
+    return TribbleStatus::OK;
+
+//    return TribbleStatus::NOT_IMPLEMENTED;
   }
 
   void GetTribbles(TribbleResponse& _return, const std::string& userid) {
     // Your implementation goes here
-    _return.status = TribbleStatus::NOT_IMPLEMENTED;
     printf("GetTribbles\n");
+
+    string uID = userid + ":tribble"; 
+    KeyValueStore::GetListResponse res = GetList(uID);
+    vector<string> get_t_list = res.values;
+    printf("Getlist Response Status: %d ; Tribble size : %d \n",res.status, (int)get_t_list.size());
+//    vector<Tribble> t_list ;
+    Tribbler::Tribble t_list_node;
+    for(vector<string>::iterator it = get_t_list.begin();
+	it != get_t_list.end(); ++it)
+    {
+	t_list_node.contents = *it ;// it;
+	(_return.tribbles).push_back(t_list_node);
+    }
+    //     _return.tribbles = t_list;
+    // _return.status = TribbleStatus::NOT_IMPLEMENTED;
+    _return.status = TribbleStatus::OK;
+
   }
 
   void GetTribblesBySubscription(TribbleResponse& _return, const std::string& userid) {
-    // Your implementation goes here
-    _return.status = TribbleStatus::NOT_IMPLEMENTED;
-    printf("GetTribblesBySubscription\n");
+      // Your implementation goes here
+      printf("GetTribblesBySubscription\n");
+      string user_get_friends = userid + ":friends_tweets" ;	
+      printf("fetch %s\n", user_get_friends.c_str());
+      KeyValueStore::GetListResponse res = GetList(user_get_friends);
+      vector<string> get_t_list = res.values;
+      printf("Getlist Response Status: %d ; Tribble size : %d \n",res.status, (int)get_t_list.size());
+      //    vector<Tribble> t_list ;
+      Tribbler::Tribble t_list_node;
+      for(vector<string>::iterator it = get_t_list.begin();
+	  it != get_t_list.end(); ++it)
+      {
+	  t_list_node.contents = *it ;// it;
+	  (_return.tribbles).push_back(t_list_node);
+      }
+      //     _return.tribbles = t_list;
+      // _return.status = TribbleStatus::NOT_IMPLEMENTED;
+      _return.status = TribbleStatus::OK;
+      //    _return.status = TribbleStatus::NOT_IMPLEMENTED;
   }
 
   void GetSubscriptions(SubscriptionResponse& _return, const std::string& userid) {
     // Your implementation goes here
-    _return.status = TribbleStatus::NOT_IMPLEMENTED;
+
     printf("GetSubscriptions\n");
+
+    string uID = userid + ":friends"; 
+    KeyValueStore::GetListResponse res = GetList(uID);
+    vector<string> get_t_list = res.values;
+    printf("Getlist Response Status: %d ; Tribble size : %d \n",res.status, (int)get_t_list.size());
+//    vector<Tribble> t_list ;
+//    Tribbler::Tribble t_list_node;
+    for(vector<string>::iterator it = get_t_list.begin();
+	it != get_t_list.end(); ++it)
+    {
+	(_return.subscriptions).push_back(*it);
+    }
+
+//     _return.tribbles = t_list;
+    // _return.status = TribbleStatus::NOT_IMPLEMENTED;
+    _return.status = TribbleStatus::OK;
   }
 
   // Functions from interacting with the storage RPC server
@@ -109,6 +221,19 @@ class TribblerHandler : virtual public TribblerIf {
     st = kv_client.AddToList(key, value);
     transport->close();
     return st;
+  }
+
+  KeyValueStore::GetListResponse GetList(std::string key) {
+      KeyValueStore::GetListResponse response;
+      // Making the RPC Call to the Storage server
+      boost::shared_ptr<TSocket> socket(new TSocket(_storageServer, _storageServerPort));
+      boost::shared_ptr<TTransport> transport(new TBufferedTransport(socket));
+      boost::shared_ptr<TProtocol> protocol(new TBinaryProtocol(transport));
+      KeyValueStoreClient client(protocol);
+      transport->open();
+      client.GetList(response, key);
+      transport->close();
+      return response;
   }
 
   KVStoreStatus::type RemoveFromList(std::string key, std::string value) {
