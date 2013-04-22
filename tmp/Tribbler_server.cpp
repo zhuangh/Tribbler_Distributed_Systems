@@ -18,8 +18,6 @@
 #include <boost/property_tree/ptree.hpp>
 #include <boost/property_tree/json_parser.hpp>
 #include <boost/uuid/sha1.hpp>
-#include <algorithm>
-
 using boost::property_tree::ptree; 
 using boost::property_tree::read_json; 
 using boost::property_tree::write_json;
@@ -45,10 +43,6 @@ class TribblerHandler : virtual public TribblerIf {
     // Your initialization goes here
     _storageServer = storageServer;
     _storageServerPort = storageServerPort;
-  }
-
-  static bool compareTribbleFunc(const Tribbler::Tribble & a, const  Tribbler::Tribble & b){
-     return (a.posted > b.posted); 
   }
 
   TribbleStatus::type CreateUser(const std::string& userid) {
@@ -306,20 +300,13 @@ class TribblerHandler : virtual public TribblerIf {
 	    tmptrib_class.contents = tribstr;
 	    tmptrib_class.userid = trib.get<string>("user_id");
 	    tmptrib_class.posted = trib.get<int64_t>("time_stamp");
-	    // insert a binarry tree 
-	    // remove the push back here
 	    (_return.tribbles).push_back(tmptrib_class);
-	    sort( (_return.tribbles).begin(), (_return.tribbles).end(), compareTribbleFunc);
 	    cnt++;
 	    if ( cnt == 100 ) { 
-		// build into return.tribbles use push_back
 		_return.status = TribbleStatus::OK;
 		return ;
 	    }
 	}
-
-	// build into return.tribbles use push_back
-	
 	_return.status = TribbleStatus::OK;
     }
     else{
@@ -453,12 +440,11 @@ class TribblerHandler : virtual public TribblerIf {
 	  }
 	  else {
 	      _return.status = TribbleStatus::OK;
-	      sort( (_return.tribbles).begin(), (_return.tribbles).end(), compareTribbleFunc);
 	      return;
 	  }
       }
       _return.status = TribbleStatus::OK;
-      sort( (_return.tribbles).begin(), (_return.tribbles).end(), compareTribbleFunc);
+
 /*
       string user_get_friends = userid + ":friends_tweets" ;	
       printf("fetch %s\n", user_get_friends.c_str());
