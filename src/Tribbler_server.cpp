@@ -12,7 +12,17 @@
 #include <thrift/server/TSimpleServer.h>
 #include <thrift/transport/TServerSocket.h>
 #include <thrift/transport/TBufferTransports.h>
+// added by me
 #include <boost/lexical_cast.hpp>
+#include <sstream>
+#include <boost/property_tree/ptree.hpp>
+#include <boost/property_tree/json_parser.hpp>
+#include <boost/uuid/sha1.hpp>
+using boost::property_tree::ptree; 
+using boost::property_tree::read_json; 
+using boost::property_tree::write_json;
+
+
 
 using namespace ::apache::thrift;
 using namespace ::apache::thrift::protocol;
@@ -38,32 +48,74 @@ class TribblerHandler : virtual public TribblerIf {
   TribbleStatus::type CreateUser(const std::string& userid) {
     // Your implementation goes here
     printf("CreateUser\n");
-    string uList = "USER_LIST";
+    KeyValueStore::GetResponse validate_id = Get(userid);
+    printf("After Validation the status is %d\n",validate_id.status);
+    if( validate_id.status != KVStoreStatus::EKEYNOTFOUND  )
+	return TribbleStatus::EEXISTS ;
+
+    //     string uList = "USER_LIST";
     string uID = userid;
     // KeyValueStore::GetResponse res = AddToList(uList,userid);
-    KVStoreStatus::type st = AddToList(uList,userid);
+    KVStoreStatus::type st = Put(userid,"");
+    //    KVStoreStatus::type st = AddToList(uList,userid);
     //    string vID = "000"; 
     // EKEYNOTFOUND = 2,
-    printf("KV st = %d\n",st);
-
+    printf("Create User st = %d\n",st);
+    return TribbleStatus::OK;
     // if (st == KVStoreStatus::EITEMNOTFOUND){
-    if (st == KVStoreStatus::OK){
-	printf("after creating, check it = %d\n", st);
-	return TribbleStatus::OK;
-    }
-    else{
-	printf("User Name Already Used. Create with New cool name! \n");
-	return TribbleStatus::EEXISTS ;
-    }
+    //    if (st == KVStoreStatus::OK){
+    //	printf("after creating, check it = %d\n", st);
+
+    //   }
+    //  else{
+    //	printf("User Name Already Used. Create with New cool name! \n");
+    //	return TribbleStatus::EEXISTS ;
+    //   }
   }
 
   TribbleStatus::type AddSubscription(const std::string& userid, const std::string& subscribeto) {
     // Your implementation goes here
     printf("AddSubscription\n");
-    // is there the user existed?
-    if(userid == subscribeto ) return TribbleStatus::INVALID_SUBSCRIBETO;
-    string user_list = "USER_LIST";
 
+    KeyValueStore::GetResponse validate_id = Get(userid);
+    printf("Validate the user  %d\n",validate_id.status);
+    if( validate_id.status == KVStoreStatus::EKEYNOTFOUND  )
+	return TribbleStatus::INVALID_USER;
+    // is there the user existed?
+    // verify the id is in the USER_LIST or not
+    //    string user_list = "USER_LIST";
+    // KeyValueStore::GetListResponse
+    validate_id = Get(subscribeto);
+    printf("Validate the subscrito %d\n",validate_id.status);
+    if( validate_id.status == KVStoreStatus::EKEYNOTFOUND  )
+	return TribbleStatus::INVALID_SUBSCRIBETO;
+
+    string userid_subs = userid+":subscriptions";
+    KeyValueStore::GetListResponse subs = GetList(userid_subs);
+    vector<string> subs_vec = subs.values;
+    int sz = subs_vec.size();
+    if ( sz > 0) {
+	//	for(int i = 0 ; i < sz; i++){
+	for(vector<string>::iterator it = subs_vec.begin() ; it != subs_vec.end(); it++)
+	{
+	    if ( *it == subscribeto){
+		return TribbleStatus::OK;
+	    } 
+	}
+    }
+    //    KVStoreStatus::type st =	
+    AddToList(userid_subs,subscribeto);
+    return TribbleStatus::OK;
+    
+/* 
+    KVStoreStatus::type res_id =   AddToList(user_list, userid);
+    if(res_id != KVStoreStatus::EITEMEXISTS ){
+	printf("not %s found in our system...\n", userid.c_str());
+	RemoveFromList(user_list,userid);
+	return TribbleStatus::INVALID_SUBSCRIBETO;
+    }
+
+    if(userid == subscribeto ) return TribbleStatus::INVALID_SUBSCRIBETO;
     KVStoreStatus::type usercheck = AddToList(user_list, subscribeto);
     if( usercheck == KVStoreStatus::EITEMEXISTS){
 	//	KVStoreStatus::type st =
@@ -83,7 +135,6 @@ class TribblerHandler : virtual public TribblerIf {
     return TribbleStatus::INVALID_SUBSCRIBETO;
 
 //    KVStoreStatus::type st = AddToList(sub, subscribeto.c_str());
-/*
     if( st == KVStoreStatus::OK){
 	printf("Add a subscription to %s for %s", subscribeto.c_str(), sub.c_str());	
 	return TribbleStatus::OK;
@@ -93,18 +144,32 @@ class TribblerHandler : virtual public TribblerIf {
 	printf("Not add a subscription to %s for %s", subscribeto.c_str(), sub.c_str());	
 	return TribbleStatus::OK;
 
-    */
      // return TribbleStatus::NOT_IMPLEMENTED;
+    */
   }
 
   TribbleStatus::type RemoveSubscription(const std::string& userid, const std::string& subscribeto) {
     // Your implementation goes here
     printf("RemoveSubscription\n");
-    string sub = userid+":friends";
-//    KVStoreStatus s
-    KVStoreStatus::type st = RemoveFromList(sub, subscribeto.c_str());
+
+    KeyValueStore::GetResponse validate_id = Get(userid);
+    printf("Validate the user  %d\n",validate_id.status);
+    if( validate_id.status == KVStoreStatus::EKEYNOTFOUND  )
+	return TribbleStatus::INVALID_USER;
+
+    validate_id = Get(subscribeto);
+    printf("Validate the user  %d\n",validate_id.status);
+    if( validate_id.status == KVStoreStatus::EKEYNOTFOUND  )
+	return TribbleStatus::INVALID_USER;
+
+    string userid_subs = userid+":subscriptions";
+    //    KVStoreStatus s
+    // KVStoreStatus::type;
+    RemoveFromList(userid_subs, subscribeto);
+    return TribbleStatus::OK;
+    /*
     printf("%s Remove Subscription %s\n",userid.c_str(), sub.c_str());
-   // if( st == KVStoreStatus::EITEMEXISTS){
+    // if( st == KVStoreStatus::EITEMEXISTS){
 	printf("Remove a subscription to %s for %s", subscribeto.c_str(), sub.c_str());	
 	string to_rm = subscribeto+":befriended";
 	RemoveFromList(to_rm, userid);
@@ -115,14 +180,57 @@ class TribblerHandler : virtual public TribblerIf {
     return TribbleStatus::OK;
     // return TribbleStatus::INVALID_SUBSCRIBETO;
     // return TribbleStatus::NOT_IMPLEMENTED;
+    */
   }
 
   TribbleStatus::type PostTribble(const std::string& userid, const std::string& tribbleContents) {
     // Your implementation goes here
     printf("PostTribble\n");
+    // trib.userid 
+    KeyValueStore::GetResponse validate_id = Get(userid);
+    printf("Validate the user  %d\n",validate_id.status);
+    if( validate_id.status == KVStoreStatus::EKEYNOTFOUND  )
+	return TribbleStatus::INVALID_USER;
+
+    // trib posted = timestamp
+    // trib contents
+    // json trib => jsonstr
+    // hash str => hashstr
+    // add index to user's tribindex (userid:tribindex)
+    // add tribble to hashtable (userid:hashstr,jsonstr)
+
     string user_tribbles = userid+":tribble";
     string timestamp = boost::lexical_cast<string> (time(NULL)); 
     string time_tribble = timestamp+":"+tribbleContents ;
+
+    ptree pt; 
+    pt.put("user_id", userid);
+    pt.put("time_stamp", time(NULL));
+    pt.put("tribble", tribbleContents);
+//    write_json("tribble.json",pt);
+//    string marshal_tribble="";
+    std::stringstream marshal_tribble_tmp;
+    write_json(marshal_tribble_tmp,pt);
+    string marshal_tribble = marshal_tribble_tmp.str();
+    
+    printf("tribble in json %s\n",marshal_tribble.c_str());
+
+    // for hash function just like Git, do not treat it as security protection 
+    // it is tweeting ... not password .
+    boost::uuids::detail::sha1 hash_sha1 ;
+    // hash_sha1.process_bytes(marshal_tribble.c_str(),marshal_tribble.size());
+    string hash_trib =  Sha1sum(marshal_tribble.c_str(),marshal_tribble.size());
+
+    printf("hashing tribble in json %s\n",hash_trib.c_str());
+
+
+    string user_trib_index = userid+":trib_index";
+    AddToList(user_trib_index,hash_trib);
+    string user_hashtrib = userid+hash_trib;
+    KVStoreStatus::type uhres =    Put(user_hashtrib, marshal_tribble); // record the real tweets
+    printf("Put the trib in KV. The status: %d\n", uhres);
+
+/*
     KVStoreStatus::type st = AddToList(user_tribbles, time_tribble);
     printf("Post status %d\n",st);
     if(st == KVStoreStatus::OK){
@@ -141,6 +249,7 @@ class TribblerHandler : virtual public TribblerIf {
        st_prop = AddToList(key,time_tribble_tmp); 
        printf("\" %s \" from me and propagate to %s. Return the state %d\n", time_tribble_tmp.c_str() , key.c_str(), st_prop);
     }
+    */
     return TribbleStatus::OK;
 
 //    return TribbleStatus::NOT_IMPLEMENTED;
@@ -149,10 +258,45 @@ class TribblerHandler : virtual public TribblerIf {
   void GetTribbles(TribbleResponse& _return, const std::string& userid) {
     // Your implementation goes here
     printf("GetTribbles\n");
+    // get userid:tribindex => list
+    // get userid:list(i) =>  jsontrib 
+    // unmashal(jsontrib) => trib 
 
-    string uID = userid + ":tribble"; 
-    KeyValueStore::GetListResponse res = GetList(uID);
-    vector<string> get_t_list = res.values;
+    KeyValueStore::GetResponse validate_id = Get(userid);
+    printf("Validate the user  %d\n",validate_id.status);
+    if( validate_id.status == KVStoreStatus::EKEYNOTFOUND  )
+	return ;//TribbleStatus::INVALID_USER;
+
+    string user_trib_index = userid+":trib_index";
+
+    KeyValueStore::GetListResponse index = GetList(user_trib_index);
+//    string uID = userid + ":tribble"; 
+ //   KeyValueStore::GetListResponse res = GetList(uID);
+    vector<string> get_t_list = index.values;
+  //  size_t sz = get_t_list.size();
+//     for( size_t i = sz-1; i >= 0 ; i--   )
+    string tmp = "";
+    ptree trib;
+//    stringstream trib = ""; 
+    string tribstr ="";
+    KeyValueStore::GetResponse ind ; 
+    Tribbler::Tribble tmptrib_class;
+    printf("the index size = %d\n",(int)get_t_list.size());
+    for(vector<string>::iterator it = get_t_list.end();
+	it != get_t_list.begin(); it--)
+    {
+	tmp = userid+(*it);
+	printf("username and index = %s",tmp.c_str());
+	ind = Get(tmp);
+	stringstream tribss(ind.value);
+	read_json(tribss,trib);
+	printf("Readin the trib from json %s\n",(ind.value).c_str());
+	tribstr = trib.get<string>("tribble");
+
+	tmptrib_class.contents = tribstr;
+	(_return.tribbles).push_back(tmptrib_class);
+    }
+/*
     printf("Getlist Response Status: %d ; Tribble size : %d \n",res.status, (int)get_t_list.size());
 //    vector<Tribble> t_list ;
     Tribbler::Tribble t_list_node;
@@ -164,13 +308,31 @@ class TribblerHandler : virtual public TribblerIf {
     }
     //     _return.tribbles = t_list;
     // _return.status = TribbleStatus::NOT_IMPLEMENTED;
+    */
     _return.status = TribbleStatus::OK;
 
   }
 
   void GetTribblesBySubscription(TribbleResponse& _return, const std::string& userid) {
       // Your implementation goes here
+
       printf("GetTribblesBySubscription\n");
+      // initilizaion the subscriptions 
+      // get userid -> verify the user
+      // getlist(userid:subscriptions) => list_sub_string
+      // getlist(list_sub_string(i):tribindex) => list_sub_string(i).Indices 
+
+      KeyValueStore::GetResponse validate_id = Get(userid);
+
+      if(validate_id.status == KVStoreStatus::EKEYNOTFOUND )
+	  return ; 
+      
+       
+
+      //compare the current subscrip and find out the current latest, and iteration till 100
+
+
+
       string user_get_friends = userid + ":friends_tweets" ;	
       printf("fetch %s\n", user_get_friends.c_str());
       KeyValueStore::GetListResponse res = GetList(user_get_friends);
@@ -194,9 +356,27 @@ class TribblerHandler : virtual public TribblerIf {
 
     printf("GetSubscriptions\n");
 
-    string uID = userid + ":friends"; 
-    KeyValueStore::GetListResponse res = GetList(uID);
+    KeyValueStore::GetResponse validate_id = Get(userid);
+    printf("After Validation the status is %d\n",validate_id.status);
+    if( validate_id.status == KVStoreStatus::EKEYNOTFOUND  )
+	return; //;TribbleStatus::INVALID_USER ;
+    string userid_subs = userid+":subscriptions";
+    KeyValueStore::GetListResponse res =  GetList(userid_subs);
+    printf("After Getlist the status is %d\n",res.status);
     vector<string> get_t_list = res.values;
+    printf("Subs list size: %d\n",(int)get_t_list.size());
+    /*
+    for(vector<string>::iterator it = get_t_list.begin();
+	it != get_t_list.end(); ++it)
+    {
+	(_return.subscriptions).push_back(*it);
+    }
+    */
+   _return.subscriptions = res.values;
+    _return.status = TribbleStatus::OK;
+/*
+    string uID = userid + ":friends"; 
+    KeyValueStore::GetListResponse res = GetList(uID); vector<string> get_t_list = res.values;
     printf("Getlist Response Status: %d ; Tribble size : %d \n",res.status, (int)get_t_list.size());
 //    vector<Tribble> t_list ;
 //    Tribbler::Tribble t_list_node;
@@ -208,7 +388,9 @@ class TribblerHandler : virtual public TribblerIf {
 
 //     _return.tribbles = t_list;
     // _return.status = TribbleStatus::NOT_IMPLEMENTED;
-    _return.status = TribbleStatus::OK;
+    */
+
+
   }
 
   // Functions from interacting with the storage RPC server
@@ -279,6 +461,28 @@ class TribblerHandler : virtual public TribblerIf {
     transport->close();
     printf("Close Transport... \n");
     return response;
+  }
+  // acknowledge github here  
+  std::string Sha1sum(const void *data, std::size_t count) {
+      boost::uuids::detail::sha1 hasher;
+      char hash[20];
+      hasher.process_bytes(data, count);
+      unsigned int digest[5];
+      hasher.get_digest(digest);
+      for(int i = 0; i < 5; ++i) {
+	  const char *tmp = reinterpret_cast<char *>(digest);
+	  hash[i * 4] = tmp[i * 4 + 3];
+	  hash[i * 4 + 1] = tmp[i * 4 + 2];
+	  hash[i * 4 + 2] = tmp[i * 4 + 1];
+	  hash[i * 4 + 3] = tmp[i * 4];
+      }
+      std::stringstream res;
+      res << std::hex;
+      for(int i = 0; i < 20; ++i) {
+	  res << ((hash[i] & 0x000000F0) >> 4)
+	      <<  (hash[i] & 0x0000000F);
+      }
+      return res.str();
   }
 
  private:
