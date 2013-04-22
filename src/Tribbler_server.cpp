@@ -104,11 +104,14 @@ class TribblerHandler : virtual public TribblerIf {
 //    KVStoreStatus s
     KVStoreStatus::type st = RemoveFromList(sub, subscribeto.c_str());
     printf("%s Remove Subscription %s\n",userid.c_str(), sub.c_str());
-    if( st == KVStoreStatus::EITEMEXISTS){
+   // if( st == KVStoreStatus::EITEMEXISTS){
 	printf("Remove a subscription to %s for %s", subscribeto.c_str(), sub.c_str());	
+	string to_rm = subscribeto+":befriended";
+	RemoveFromList(to_rm, userid);
+	printf("Remove %s from %s's friend\n",to_rm.c_str(), userid.c_str());
 	return TribbleStatus::OK;
-    }
-    printf("Fail to add a subscription to %s for %s", subscribeto.c_str(), sub.c_str());	
+   // }
+   // printf("Fail to remove a subscription to %s for %s", subscribeto.c_str(), sub.c_str());	
     return TribbleStatus::OK;
     // return TribbleStatus::INVALID_SUBSCRIBETO;
     // return TribbleStatus::NOT_IMPLEMENTED;
@@ -136,7 +139,7 @@ class TribblerHandler : virtual public TribblerIf {
        key = (*it)+":friends_tweets" ;	
        time_tribble_tmp = userid+":"+time_tribble;
        st_prop = AddToList(key,time_tribble_tmp); 
-       printf("%s after propagate to %s, the state %d\n", time_tribble_tmp.c_str() , key.c_str(), st_prop);
+       printf("\" %s \" from me and propagate to %s. Return the state %d\n", time_tribble_tmp.c_str() , key.c_str(), st_prop);
     }
     return TribbleStatus::OK;
 
@@ -175,8 +178,7 @@ class TribblerHandler : virtual public TribblerIf {
       printf("Getlist Response Status: %d ; Tribble size : %d \n",res.status, (int)get_t_list.size());
       //    vector<Tribble> t_list ;
       Tribbler::Tribble t_list_node;
-      for(vector<string>::iterator it = get_t_list.begin();
-	  it != get_t_list.end(); ++it)
+      for(vector<string>::iterator it = get_t_list.begin(); it != get_t_list.end(); ++it)
       {
 	  t_list_node.contents = *it ;// it;
 	  (_return.tribbles).push_back(t_list_node);
