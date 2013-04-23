@@ -382,11 +382,11 @@ public:
 	      for(vector<string>::iterator it = get_t_list.end()-1; it != get_t_list.begin()-1; it--)
 	      {
 		  tmp = userid+(*it);
-		  printf("username and index = %s\n",tmp.c_str()/*,tmp.c_str()*/);
+//		  printf("username and index = %s\n",tmp.c_str()/*,tmp.c_str()*/);
 		  ind = Get(tmp);
 		  stringstream tribss(ind.value);
 		  read_json(tribss,trib);
-		  printf("Readin the trib from json %s\n",(ind.value).c_str());
+//		  printf("Readin the trib from json %s\n",(ind.value).c_str());
 		  tribstr = trib.get<string>("tribble");
 		  tmptrib_class.contents = tribstr;
 		  tmptrib_class.userid = trib.get<string>("user_id");
@@ -419,19 +419,19 @@ public:
   void GetTribblesBySubscription(TribbleResponse& _return, const std::string& userid) {
       // Your implementation goes here
 
-      printf("---------------------------------\n");
-      printf("---------------------------------\n");
-      printf("---------------------------------\n");
+      //printf("---------------------------------\n");
+      //printf("---------------------------------\n");
+     // printf("---------------------------------\n");
       printf("GetTribblesBySubscription\n");
-      printf("---------------------------------\n");
-      printf("---------------------------------\n");
+      // printf("---------------------------------\n");
+      // printf("---------------------------------\n");
       // initilizaion the subscriptions 
       // get userid -> verify the user
       // getlist(userid:subscriptions) => list_sub_string
       // getlist(list_sub_string(i):tribindex) => list_sub_string(i).Indices 
 
       KeyValueStore::GetResponse validate_id = Get(userid);
-      printf("Validate the user  %d\n",validate_id.status);
+      // printf("Validate the user  %d\n",validate_id.status);
       if( validate_id.status == KVStoreStatus::EKEYNOTFOUND  )
 	  return ;//TribbleStatus::INVALID_USER;
       string userid_subs = userid+":subscriptions";
@@ -485,13 +485,12 @@ public:
 
 	  for(int jj = 0; jj < subs_index[flag] + 1 ; jj++){
 	      uid_tmp = subs_userid[flag] + (subs_indices[flag])[ jj ];
-	      printf("uid_tmp = %s\n", uid_tmp.c_str());
+//	      printf("uid_tmp = %s\n", uid_tmp.c_str());
 	      trib_marsh = Get( uid_tmp );
 	      // printf("get the %s\n", (trib_marsh.value).c_str() );
 	      stringstream  tmp_msh(trib_marsh.value);
-	      printf("Read to sort %s    " , (tmp_msh.str()).c_str());
+//	      printf("Read to sort %s    " , (tmp_msh.str()).c_str());
 	      read_json(tmp_msh, trib);
-
 	      tmptrib_class.contents = trib.get<string>("tribble");
 // 	      printf("tmptrib contents %s\n", (tmptrib_class.contents).c_str());
 	      tmptrib_class.userid = trib.get<string>("user_id");
@@ -499,17 +498,18 @@ public:
 	      friend_cur_trib.push_back(tmptrib_class);
 	      // (friends_arrays[flag]).push_back(tmptrib_class);
 	  }
-	  printf("current clas s size %d",(int) friend_cur_trib.size());
+//	  printf("current clas s size %d",(int) friend_cur_trib.size());
 
 	  friends_arrays.push_back(friend_cur_trib);
 
 
-	  printf("before sorting ?!@!@#@!# %d,    ", (int) (friends_arrays[flag]).size() ); 
+//	  printf("before sorting ?!@!@#@!# %d,    ", (int) (friends_arrays[flag]).size() ); 
 	  // for(vector<Tribble>::iterator fit = (friends_arrays[flag]).begin();
 	    //  fit != (friends_arrays[flag]).end(); fit++){
 	  // }
 	  sort( (friends_arrays[flag]).begin(), (friends_arrays[flag]).end(), compareTribbleFuncRev);
 
+/*
 	  printf("after sorting ?!@!@#@!# %d\n  ", (int) (friends_arrays[flag]).size() ); 
 
 	  for(vector<Tribble>::iterator fit = (friends_arrays[flag]).begin();
@@ -517,6 +517,7 @@ public:
 	      printf("?!@!@#@!# timestamp = %d, ", (int) ((*fit).posted) ); 
 	      printf("?!@!@#@!# content = %s\n", ((*fit).contents).c_str() ); 
 	  }
+	  */
 // --- 
 
 
@@ -539,14 +540,14 @@ public:
 	  printf("after  sort\n");
 	  printf("\n");
  */
-	  printf("subs_indices's size = %d\n",(int)  (subs_indices).size()); 
-	  printf("current element of subs_indices's size = %d\n",(int)  (subs_indices[flag]).size()); 
-	  printf("\n\n");
+	  // printf("subs_indices's size = %d\n",(int)  (subs_indices).size()); 
+	  // printf("current element of subs_indices's size = %d\n",(int)  (subs_indices[flag]).size()); 
+	 // printf("\n\n");
 
 	  // initized the friends
 	  // add non empty tribbers from friends
 	  if(subs_index[flag] >= 0 ){
-	      printf("subs_index[flag] = %d\n", (int) subs_index[flag]);
+	  //    printf("subs_index[flag] = %d\n", (int) subs_index[flag]);
 	      
 	      // reduce the index to get the last element
 
@@ -557,9 +558,9 @@ public:
 //	      stringstream tmp_msh(trib_marsh.value);
 //	      read_json(tmp_msh, trib);
 
-	      printf("????????????????????????????????????????The friends array size %d and subs_index is %d,   ", 
-		     (int ) (friends_arrays[flag]).size(), (int) subs_index[flag]);
-	      printf("!~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ ~~~~ \n\n %s ",( (( friends_arrays[flag]).at(subs_index[flag])).contents).c_str());
+//	      printf("????????????????????????????????????????The friends array size %d and subs_index is %d,   ", 
+//		     (int ) (friends_arrays[flag]).size(), (int) subs_index[flag]);
+	    //  printf("!~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ ~~~~ \n\n %s ",( (( friends_arrays[flag]).at(subs_index[flag])).contents).c_str());
 	      tmptrib_class.contents = (( friends_arrays[flag]).at(subs_index[flag])).contents;
 	      // trib.get<string>("tribble");// 	      printf("tmptrib contents %s\n", (tmptrib_class.contents).c_str());
 	      tmptrib_class.userid =( (friends_arrays[flag]).at(subs_index[flag])).userid ;// trib.get<string>("user_id");
@@ -569,17 +570,17 @@ public:
 //	      tmptrib_class =l/
 //	       subs_current_trib.push_back(friends_arrays[flag])[ subs_index[flag] ];
 
-	      printf("tmptrib contents after getting !! %s\n", 
-		     (subs_current_trib[flag].contents).c_str());
+//	      printf("tmptrib contents after getting !! %s\n", 
+//		     (subs_current_trib[flag].contents).c_str());
 //	      subs_index[flag]-- ;
-	      printf("after reduce subs_index[flag] = %d\n",(int) subs_index[flag]);
+//	      printf("after reduce subs_index[flag] = %d\n",(int) subs_index[flag]);
 	  }
 
 	  flag++;
       }
 
       //compare the current subscrip and find out the current latest, and iteration till 100
-      printf("The Flag final value = %d !!!!!!!!!!!!!!!!!!!!\n",flag);
+//      printf("The Flag final value = %d !!!!!!!!!!!!!!!!!!!!\n",flag);
 
       int cnt_subs_trib = 100; 
       int min_int  = -1;
@@ -587,13 +588,13 @@ public:
       for(int i = 0 ; i < cnt_subs_trib ; i++){
 	  min_int  = -1;
 	  for (int j = 0; j<flag ; j++){
-	      printf("subs_index[%d]=%d    ", j,subs_index[j]);
+//	      printf("subs_index[%d]=%d    ", j,subs_index[j]);
 	      if( ( min_int == -1 && subs_index[j] > -1 ) || (   min_int > -1 &&  subs_index[j] > -1  
 								 && (subs_current_trib[j].posted > subs_current_trib[min_int].posted )  ) ){
 		  min_int = j;
 	      }
 	  } // for j
-	  printf("\n the min_int in iteration #%d is %d\n ",i, min_int);	
+// 	  printf("\n the min_int in iteration #%d is %d\n ",i, min_int);	
 
 	  if(min_int > -1) {
 	      (_return.tribbles).push_back(subs_current_trib[min_int]);
@@ -605,11 +606,11 @@ public:
 		  // update this friend with previous page index 
 		  uidx = subs[min_int] +":trib_index"+":"+(boost::lexical_cast<string>(subs_cur_group[min_int]));
 		  // can tag the current number and transfer smaller index for subs
-		  printf("%d The subs people = %s\n", flag, uidx.c_str());
+		 // printf("%d The subs people = %s\n", flag, uidx.c_str());
 		  tmp_indices    = GetList(uidx ); 
 		  vector<string> tmp_ind = tmp_indices.values; 
 		  subs_index[min_int] = (tmp_ind.size()-1);
-		  printf("%d\n",(int) tmp_ind.size()); 
+		 //  printf("%d\n",(int) tmp_ind.size()); 
 		  // the real infomation are stored in the indices contains time stamp, id, tweets 
 		  subs_indices[min_int] = (tmp_ind);
 		  // --- 
@@ -620,11 +621,11 @@ public:
 
 		  for(int jj = 0; jj < subs_index[min_int] + 1 ; jj++){
 		      uid_tmp = subs_userid[min_int] + (subs_indices[min_int])[ jj ];
-		      printf("uid_tmp = %s\n", uid_tmp.c_str());
+//		      printf("uid_tmp = %s\n", uid_tmp.c_str());
 		      trib_marsh = Get( uid_tmp );
 		      // printf("get the %s\n", (trib_marsh.value).c_str() );
 		      stringstream  tmp_msh(trib_marsh.value);
-		      printf("Read to sort %s    " , (tmp_msh.str()).c_str());
+//		      printf("Read to sort %s    " , (tmp_msh.str()).c_str());
 		      read_json(tmp_msh, trib);
 
 		      tmptrib_class.contents = trib.get<string>("tribble");
@@ -635,10 +636,10 @@ public:
 		      // (friends_arrays[min_int]).push_back(tmptrib_class);
 		      (friends_arrays[min_int])[jj]= tmptrib_class ;
 		  }
-		  printf("current clas s size %d",(int) friend_cur_trib.size());
+//		  printf("current clas s size %d",(int) friend_cur_trib.size());
 
 		 // friends_arrays[min_int]=friend_cur_trib;
-		  printf("before sorting ?!@!@#@!# %d,    ", (int) (friends_arrays[flag]).size() ); 
+//		  printf("before sorting ?!@!@#@!# %d,    ", (int) (friends_arrays[flag]).size() ); 
 		  // for(vector<Tribble>::iterator fit = (friends_arrays[flag]).begin();
 		  //  fit != (friends_arrays[flag]).end(); fit++){
 		  // }
