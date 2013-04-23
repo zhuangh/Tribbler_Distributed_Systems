@@ -433,6 +433,8 @@ public:
       vector< vector<string> > subs_indices ;  
     //   vector<size_t> subs_index;  
       vector<int> subs_index;  
+      vector<int> subs_msg;  
+      vector<int> subs_cur_group;  
       vector<string> subs_userid;  
       Tribbler::Tribble tmptrib_class;
       vector< Tribbler::Tribble > subs_current_trib;
@@ -440,16 +442,24 @@ public:
       vector< vector< Tribbler::Tribble > >  friends_arrays;
       // tmp trib
       ptree trib;
+
       int flag = 0;
       string uidx ="";
       KeyValueStore::GetListResponse tmp_indices; //  GetList(user_trib_index);
       KeyValueStore::GetResponse trib_marsh; //  GetList(user_trib_index);
+      
 //      vector< vector<string> >::iterator it_ind = subs_indices.begin();  
       for(vector<string>::iterator it = subs.begin();it != subs.end(); it++){
+	  validate_id = Get(*it);
+	  int tmp_num = boost::lexical_cast<int> (validate_id.value); 
+	  cout<<"FETCH the msg for "<< (*it) <<"   ---> "<< validate_id.value<<endl;
+	  subs_msg.push_back(tmp_num );
+	  subs_cur_group.push_back(tmp_num/ message_memory  );
 
-	  uidx = (*it)+":trib_index";
+	  // uidx = (*it)+":trib_index";
+	  uidx = (*it)+":trib_index"+":"+(boost::lexical_cast<string>(subs_cur_group[flag]));
 	  // can tag the current number and transfer smaller index for subs
-	  printf("%d The subs people = %s\n", flag,uidx.c_str());
+	  printf("%d The subs people = %s\n", flag, uidx.c_str());
 	  tmp_indices    = GetList(uidx ); 
 	  subs_userid.push_back(*it);
 	  vector<string> tmp_ind = tmp_indices.values; 
@@ -462,6 +472,7 @@ public:
 	  // --- 
 	  // fetch in the group tweets for one friend
 	  string uid_tmp=""; 
+	  // get the current list for this firend
 
 	  for(int jj = 0; jj < subs_index[flag] + 1 ; jj++){
 	      uid_tmp = subs_userid[flag] + (subs_indices[flag])[ jj ];
@@ -578,7 +589,56 @@ public:
 	  if(min_int > -1) {
 	      (_return.tribbles).push_back(subs_current_trib[min_int]);
 	      subs_index[min_int]--;
-	      if(subs_index[min_int] > -1){ // current index > -1 means there still exist tribbles
+
+	      if(subs_index[min_int] <= -1 && subs_cur_group[min_int] > 0     )
+	      {
+		  subs_cur_group[min_int]--; 
+		  // update this friend with previous page index 
+		  uidx = subs[min_int] +":trib_index"+":"+(boost::lexical_cast<string>(subs_cur_group[min_int]));
+		  // can tag the current number and transfer smaller index for subs
+		  printf("%d The subs people = %s\n", flag, uidx.c_str());
+		  tmp_indices    = GetList(uidx ); 
+		  vector<string> tmp_ind = tmp_indices.values; 
+		  subs_index[min_int] = (tmp_ind.size()-1);
+		  printf("%d\n",(int) tmp_ind.size()); 
+		  // the real infomation are stored in the indices contains time stamp, id, tweets 
+		  subs_indices[min_int] = (tmp_ind);
+		  // --- 
+		  // fetch in the group tweets for one friend
+		  string uid_tmp=""; 
+		  // get the current list for this firend
+		  friends_arrays[min_int].resize(subs_index[min_int]+1  );
+
+		  for(int jj = 0; jj < subs_index[min_int] + 1 ; jj++){
+		      uid_tmp = subs_userid[min_int] + (subs_indices[min_int])[ jj ];
+		      printf("uid_tmp = %s\n", uid_tmp.c_str());
+		      trib_marsh = Get( uid_tmp );
+		      // printf("get the %s\n", (trib_marsh.value).c_str() );
+		      stringstream  tmp_msh(trib_marsh.value);
+		      printf("Read to sort %s    " , (tmp_msh.str()).c_str());
+		      read_json(tmp_msh, trib);
+
+		      tmptrib_class.contents = trib.get<string>("tribble");
+		      // 	      printf("tmptrib contents %s\n", (tmptrib_class.contents).c_str());
+		      tmptrib_class.userid = trib.get<string>("user_id");
+		      tmptrib_class.posted = trib.get<int64_t>("time_stamp");
+		      // friend_cur_trib.push_back(tmptrib_class);
+		      // (friends_arrays[min_int]).push_back(tmptrib_class);
+		      (friends_arrays[min_int])[jj]= tmptrib_class ;
+		  }
+		  printf("current clas s size %d",(int) friend_cur_trib.size());
+
+		 // friends_arrays[min_int]=friend_cur_trib;
+		  printf("before sorting ?!@!@#@!# %d,    ", (int) (friends_arrays[flag]).size() ); 
+		  // for(vector<Tribble>::iterator fit = (friends_arrays[flag]).begin();
+		  //  fit != (friends_arrays[flag]).end(); fit++){
+		  // }
+		  sort( (friends_arrays[min_int]).begin(), (friends_arrays[min_int]).end(), compareTribbleFuncRev);
+	      }
+	      // next update the min_int  after pop out 
+
+	      if(subs_index[min_int] > -1       )
+	      { // current index > -1 means there still exist tribbles
 		  string uid_tmp = subs_userid[min_int] + (subs_indices[min_int])[ subs_index[min_int] ];
 		  //		  trib_marsh = Get( uid_tmp );
 		  //		  stringstream tmp_msh(trib_marsh.value);
