@@ -43,7 +43,7 @@ using namespace std;
 using namespace  ::Tribbler;
 using namespace  ::KeyValueStore;
 
-static int message_memory = 50;
+static int message_memory = 5;
 
 class TribblerHandler : virtual public TribblerIf {
 public:
@@ -263,20 +263,22 @@ public:
 
  //   printf("hashing tribble in json %s\n",hash_trib.c_str());
 
-
-    string user_trib_index = userid+":trib_index";
+    int cur_msg =  boost::lexical_cast<int> (validate_id.value);
+    cur_msg++;
+//     validate_id = Get(userid) ;
+  //  cout<<validate_id.value<<endl;
+//    int tweet_num = boost::lexical_cast<int>( validate_id.value);
+ //   tweet_num++;
+    Put(userid,boost::lexical_cast<string>(cur_msg) );
+    int group = cur_msg / message_memory;
+    string str_group = ":"+boost::lexical_cast<string>(group);
+    string user_trib_index = userid+":trib_index"+str_group;
 
     printf("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
-
-    validate_id = Get(userid) ;
-    cout<<validate_id.value<<endl;
-    int tweet_num = boost::lexical_cast<int>( validate_id.value);
-    tweet_num++;
-    Put(userid,boost::lexical_cast<string>(tweet_num) );
-    validate_id = Get(userid) ;
-    cout<<validate_id.value<<endl;
-
+    cout<<"add to ---> "<< user_trib_index<<endl;
 //    printf("before update tweets number: %d\n", boost::lexical_cast<int> (validate_id.value));
+    validate_id = Get(userid) ;
+    cout<<validate_id.value<<endl;
 
     printf("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
     /*
@@ -323,86 +325,85 @@ public:
   }
 
   void GetTribbles(TribbleResponse& _return, const std::string& userid) {
-    // Your implementation goes here
-    printf("GetTribbles\n");
-    // get userid:tribindex => list
-    // get userid:list(i) =>  jsontrib 
-    // unmashal(jsontrib) => trib 
+      // Your implementation goes here
+      printf("---------------------------------\n");
+      printf("---------------------------------\n");
+      printf("---------------------------------\n");
+      printf("GetTribbles\n");
+      printf("---------------------------------\n");
+      printf("---------------------------------\n");
+      printf("---------------------------------\n");
+      
+ 
+      // get userid:tribindex => list
+      // get userid:list(i) =>  jsontrib 
+      // unmashal(jsontrib) => trib 
 
-    KeyValueStore::GetResponse validate_id = Get(userid);
-    printf("Validate the user  %d\n",validate_id.status);
-    if( validate_id.status == KVStoreStatus::EKEYNOTFOUND  )
-	return ;//TribbleStatus::INVALID_USER;
+      KeyValueStore::GetResponse validate_id = Get(userid);
+      printf("Validate the user  %d\n",validate_id.status);
+      if( validate_id.status == KVStoreStatus::EKEYNOTFOUND  )
+	  return ;//TribbleStatus::INVALID_USER;
 
-    
-    string user_trib_index = userid+":trib_index";
-    // Get My tweets/tribbles' index
-    KeyValueStore::GetListResponse index = GetList(user_trib_index);
-    //    string uID = userid + ":tribble"; 
-    //   KeyValueStore::GetListResponse res = GetList(uID);
-    vector<string> get_t_list = index.values;
-  //  size_t sz = get_t_list.size();
-//     for( size_t i = sz-1; i >= 0 ; i--   )
-    string tmp = "";
-    ptree trib;
-//    stringstream trib = ""; 
-    string tribstr ="";
-    KeyValueStore::GetResponse ind ; 
-    Tribbler::Tribble tmptrib_class;
-    if(get_t_list.size()>0){
-	printf("the index size = %d\n",(int)get_t_list.size());
-	printf("%s\n", (get_t_list[0]).c_str());
+      int cur_message = boost::lexical_cast<int> (validate_id.value);
+      int cur_group = cur_message / message_memory; 
+      int cnt = 0;
 
-	int cnt = 1;
-	// some boundary concerns 
-
-	for(vector<string>::iterator it = get_t_list.end()-1;
-	    it != get_t_list.begin()-1; it--)
-	{
-	    tmp = userid+(*it);
-	    printf("username and index = %s\n",tmp.c_str()/*,tmp.c_str()*/);
-	    ind = Get(tmp);
-	    stringstream tribss(ind.value);
-	    read_json(tribss,trib);
-	    printf("Readin the trib from json %s\n",(ind.value).c_str());
-	    tribstr = trib.get<string>("tribble");
-	    tmptrib_class.contents = tribstr;
-	    tmptrib_class.userid = trib.get<string>("user_id");
-	    tmptrib_class.posted = trib.get<int64_t>("time_stamp");
-	    // insert a binarry tree 
-	    // remove the push back here
-	    (_return.tribbles).push_back(tmptrib_class);
-	    sort( (_return.tribbles).begin(), (_return.tribbles).end(), compareTribbleFunc);
-	    cnt++;
-	    if ( cnt == 100 ) { 
-		// build into return.tribbles use push_back
-		_return.status = TribbleStatus::OK;
-		return ;
-	    }
-	}
-
-	// build into return.tribbles use push_back
-	
-	_return.status = TribbleStatus::OK;
-    }
-    else{
-	_return.status = TribbleStatus::OK;
-    }
-
-/*
-    printf("Getlist Response Status: %d ; Tribble size : %d \n",res.status, (int)get_t_list.size());
-//    vector<Tribble> t_list ;
-    Tribbler::Tribble t_list_node;
-    for(vector<string>::iterator it = get_t_list.begin();
-	it != get_t_list.end(); ++it)
-    {
-	t_list_node.contents = *it ;// it;
-	(_return.tribbles).push_back(t_list_node);
-    }
-    //     _return.tribbles = t_list;
-    // _return.status = TribbleStatus::NOT_IMPLEMENTED;
-    */
-
+      while(cnt < 100 && cur_group >= 0  ){
+	  string group = ":"+lexical_cast<string> (cur_group);
+//	  string group ="";
+	  string user_trib_index = userid+":trib_index"+group;
+	  cout<<"in the group ---> "<<user_trib_index<<endl;
+	  // Get My tweets/tribbles' index
+	  KeyValueStore::GetListResponse index = GetList(user_trib_index);
+	  //    string uID = userid + ":tribble"; 
+	  //   KeyValueStore::GetListResponse res = GetList(uID);
+	  vector<string> get_t_list = index.values;
+	  //  size_t sz = get_t_list.size();
+	  //     for( size_t i = sz-1; i >= 0 ; i--   )
+	  string tmp = "";
+	  ptree trib;
+	  //    stringstream trib = ""; 
+	  string tribstr ="";
+	  KeyValueStore::GetResponse ind ; 
+	  Tribbler::Tribble tmptrib_class;
+	  if(get_t_list.size()>0){
+	      printf("the index size = %d\n",(int)get_t_list.size());
+	      printf("%s\n", (get_t_list[0]).c_str());
+	      // some boundary concerns 
+	      for(vector<string>::iterator it = get_t_list.end()-1; it != get_t_list.begin()-1; it--)
+	      {
+		  tmp = userid+(*it);
+		  printf("username and index = %s\n",tmp.c_str()/*,tmp.c_str()*/);
+		  ind = Get(tmp);
+		  stringstream tribss(ind.value);
+		  read_json(tribss,trib);
+		  printf("Readin the trib from json %s\n",(ind.value).c_str());
+		  tribstr = trib.get<string>("tribble");
+		  tmptrib_class.contents = tribstr;
+		  tmptrib_class.userid = trib.get<string>("user_id");
+		  tmptrib_class.posted = trib.get<int64_t>("time_stamp");
+		  // insert a binarry tree 
+		  // remove the push back here
+		  (_return.tribbles).push_back(tmptrib_class);
+		  sort( (_return.tribbles).begin(), (_return.tribbles).end(), compareTribbleFunc);
+		  cnt++;
+		  if ( cnt == 100 ) { 
+		      // build into return.tribbles use push_back
+		      _return.status = TribbleStatus::OK;
+		      return ;
+		  }
+	      }
+	      // build into return.tribbles use push_back
+//	      _return.status = TribbleStatus::OK;
+	  }
+	  else{
+	      _return.status = TribbleStatus::OK;
+	      return ;// 
+	  }
+	  cur_group--;
+	  _return.status = TribbleStatus::OK;
+      }
+      // while
 
   }
 
