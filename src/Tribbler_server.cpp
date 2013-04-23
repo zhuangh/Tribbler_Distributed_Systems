@@ -24,6 +24,7 @@
 #include <boost/property_tree/json_parser.hpp>
 #include <boost/uuid/sha1.hpp>
 #include <algorithm>
+#include <sys/time.h>
 
 using boost::property_tree::ptree; 
 using boost::property_tree::read_json; 
@@ -43,7 +44,7 @@ using namespace std;
 using namespace  ::Tribbler;
 using namespace  ::KeyValueStore;
 
-static int message_memory = 5;
+static int message_memory = 50;
 
 class TribblerHandler : virtual public TribblerIf {
 public:
@@ -83,7 +84,7 @@ public:
     // Your implementation goes here
     printf("CreateUser\n");
     KeyValueStore::GetResponse validate_id = Get(userid);
-    printf("After Validation the status is %d\n",validate_id.status);
+    // printf("After Validation the status is %d\n",validate_id.status);
     if( validate_id.status != KVStoreStatus::EKEYNOTFOUND  )
 	return TribbleStatus::EEXISTS ;
 
@@ -93,12 +94,13 @@ public:
     // string tweets_num = boost::lexical_cast<string>(1);   
     string tweets_num = "0";   
     // KVStoreStatus::type st = Put(userid,"" /*tweets_num.str() */);
-    KVStoreStatus::type st = Put(userid,tweets_num);
-    cout<< tweets_num<<endl;
+   // KVStoreStatus::type st =;
+    Put(userid,tweets_num);
+    // cout<< tweets_num<<endl;
     //    KVStoreStatus::type st = AddToList(uList,userid);
     //    string vID = "000"; 
     // EKEYNOTFOUND = 2,
-    printf("Create User st = %d\n",st);
+    // printf("Create User st = %d\n",st);
     return TribbleStatus::OK;
     // if (st == KVStoreStatus::EITEMNOTFOUND){
     //    if (st == KVStoreStatus::OK){
@@ -116,7 +118,7 @@ public:
     printf("AddSubscription\n");
 
     KeyValueStore::GetResponse validate_id = Get(userid);
-    printf("Validate the user  %d\n",validate_id.status);
+    // printf("Validate the user  %d\n",validate_id.status);
     if( validate_id.status == KVStoreStatus::EKEYNOTFOUND  )
 	return TribbleStatus::INVALID_USER;
     // is there the user existed?
@@ -124,7 +126,7 @@ public:
     //    string user_list = "USER_LIST";
     // KeyValueStore::GetListResponse
     validate_id = Get(subscribeto);
-    printf("Validate the subscrito %d\n",validate_id.status);
+    // printf("Validate the subscrito %d\n",validate_id.status);
     if( validate_id.status == KVStoreStatus::EKEYNOTFOUND  )
 	return TribbleStatus::INVALID_SUBSCRIBETO;
 
@@ -191,12 +193,12 @@ public:
     printf("RemoveSubscription\n");
 
     KeyValueStore::GetResponse validate_id = Get(userid);
-    printf("Validate the user  %d\n",validate_id.status);
+    // printf("Validate the user  %d\n",validate_id.status);
     if( validate_id.status == KVStoreStatus::EKEYNOTFOUND  )
 	return TribbleStatus::INVALID_USER;
 
     validate_id = Get(subscribeto);
-    printf("Validate the user  %d\n",validate_id.status);
+    // printf("Validate the user  %d\n",validate_id.status);
     if( validate_id.status == KVStoreStatus::EKEYNOTFOUND  )
 	return TribbleStatus::INVALID_USER;
 
@@ -223,10 +225,10 @@ public:
 
   TribbleStatus::type PostTribble(const std::string& userid, const std::string& tribbleContents) {
     // Your implementation goes here
-    printf("PostTribble\n");
+     printf("PostTribble\n");
     // trib.userid 
     KeyValueStore::GetResponse validate_id = Get(userid);
-    printf("Validate the user  %d\n",validate_id.status);
+    // printf("Validate the user  %d\n",validate_id.status);
     if( validate_id.status == KVStoreStatus::EKEYNOTFOUND  )
 	return TribbleStatus::INVALID_USER;
 
@@ -244,8 +246,15 @@ public:
    // string time_tribble = timestamp+":"+tribbleContents ;
 
     ptree pt; 
+    
+
+    timespec ts;
+    // clock_gettime(CLOCK_MONOTONIC, &ts); // Works on FreeBSD
+    clock_gettime(CLOCK_REALTIME, &ts); // Works on Linux
+    // cout<<ts.tv_nsec;
+
     pt.put("user_id", userid);
-    pt.put("time_stamp", time(NULL));
+    pt.put("time_stamp", boost::lexical_cast<string> (ts.tv_sec * 1000000000 + ts.tv_nsec) );
     pt.put("tribble", tribbleContents);
 //    write_json("tribble.json",pt);
 //    string marshal_tribble="";
@@ -270,17 +279,17 @@ public:
 //    int tweet_num = boost::lexical_cast<int>( validate_id.value);
  //   tweet_num++;
     Put(userid,boost::lexical_cast<string>(cur_msg) );
-    int group = cur_msg / message_memory;
+    int group = (cur_msg-1) / message_memory;
     string str_group = ":"+boost::lexical_cast<string>(group);
     string user_trib_index = userid+":trib_index"+str_group;
 
-    printf("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
-    cout<<"add to ---> "<< user_trib_index<<endl;
+    // printf("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
+    // cout<<"add to ---> "<< user_trib_index<<endl;
 //    printf("before update tweets number: %d\n", boost::lexical_cast<int> (validate_id.value));
-    validate_id = Get(userid) ;
-    cout<<validate_id.value<<endl;
+     //// validate_id = Get(userid) ;
+    // cout<<validate_id.value<<endl;
 
-    printf("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
+    // printf("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
     /*
 
     int64_t tweets_num = boost::lexical_cast<int64_t>( validate_id.value) ;
@@ -326,13 +335,13 @@ public:
 
   void GetTribbles(TribbleResponse& _return, const std::string& userid) {
       // Your implementation goes here
-      printf("---------------------------------\n");
-      printf("---------------------------------\n");
-      printf("---------------------------------\n");
+      // printf("---------------------------------\n");
+      // printf("---------------------------------\n");
+      // printf("---------------------------------\n");
       printf("GetTribbles\n");
-      printf("---------------------------------\n");
-      printf("---------------------------------\n");
-      printf("---------------------------------\n");
+      // printf("---------------------------------\n");
+      // printf("---------------------------------\n");
+      // printf("---------------------------------\n");
       
  
       // get userid:tribindex => list
@@ -340,7 +349,7 @@ public:
       // unmashal(jsontrib) => trib 
 
       KeyValueStore::GetResponse validate_id = Get(userid);
-      printf("Validate the user  %d\n",validate_id.status);
+      // printf("Validate the user  %d\n",validate_id.status);
       if( validate_id.status == KVStoreStatus::EKEYNOTFOUND  )
 	  return ;//TribbleStatus::INVALID_USER;
 
@@ -352,7 +361,7 @@ public:
 	  string group = ":"+lexical_cast<string> (cur_group);
 //	  string group ="";
 	  string user_trib_index = userid+":trib_index"+group;
-	  cout<<"in the group ---> "<<user_trib_index<<endl;
+	  // cout<<"in the group ---> "<<user_trib_index<<endl;
 	  // Get My tweets/tribbles' index
 	  KeyValueStore::GetListResponse index = GetList(user_trib_index);
 	  //    string uID = userid + ":tribble"; 
@@ -367,8 +376,8 @@ public:
 	  KeyValueStore::GetResponse ind ; 
 	  Tribbler::Tribble tmptrib_class;
 	  if(get_t_list.size()>0){
-	      printf("the index size = %d\n",(int)get_t_list.size());
-	      printf("%s\n", (get_t_list[0]).c_str());
+	      // printf("the index size = %d\n",(int)get_t_list.size());
+	      // printf("%s\n", (get_t_list[0]).c_str());
 	      // some boundary concerns 
 	      for(vector<string>::iterator it = get_t_list.end()-1; it != get_t_list.begin()-1; it--)
 	      {
@@ -452,20 +461,20 @@ public:
       for(vector<string>::iterator it = subs.begin();it != subs.end(); it++){
 	  validate_id = Get(*it);
 	  int tmp_num = boost::lexical_cast<int> (validate_id.value); 
-	  cout<<"FETCH the msg for "<< (*it) <<"   ---> "<< validate_id.value<<endl;
+	  // cout<<"FETCH the msg for "<< (*it) <<"   ---> "<< validate_id.value<<endl;
 	  subs_msg.push_back(tmp_num );
-	  subs_cur_group.push_back(tmp_num/ message_memory  );
+	  subs_cur_group.push_back( (tmp_num-1)/ message_memory  );
 
 	  // uidx = (*it)+":trib_index";
 	  uidx = (*it)+":trib_index"+":"+(boost::lexical_cast<string>(subs_cur_group[flag]));
 	  // can tag the current number and transfer smaller index for subs
-	  printf("%d The subs people = %s\n", flag, uidx.c_str());
+	  // printf("%d The subs people = %s\n", flag, uidx.c_str());
 	  tmp_indices    = GetList(uidx ); 
 	  subs_userid.push_back(*it);
 	  vector<string> tmp_ind = tmp_indices.values; 
 	  subs_index.push_back(tmp_ind.size()-1);
-	  printf("%d\n",(int) tmp_ind.size()); 
-	  printf("userid=%s, user_index size = %d\n", (subs_userid[flag]).c_str(), (int) subs_index[flag]);
+	  // printf("%d\n",(int) tmp_ind.size()); 
+	  // printf("userid=%s, user_index size = %d\n", (subs_userid[flag]).c_str(), (int) subs_index[flag]);
 
 	  // the real infomation are stored in the indices contains time stamp, id, tweets 
 	  subs_indices.push_back(tmp_ind);
@@ -688,14 +697,14 @@ public:
     printf("GetSubscriptions\n");
 
     KeyValueStore::GetResponse validate_id = Get(userid);
-    printf("After Validation the status is %d\n",validate_id.status);
+    // printf("After Validation the status is %d\n",validate_id.status);
     if( validate_id.status == KVStoreStatus::EKEYNOTFOUND  )
 	return; //;TribbleStatus::INVALID_USER ;
     string userid_subs = userid+":subscriptions";
     KeyValueStore::GetListResponse res =  GetList(userid_subs);
-    printf("After Getlist the status is %d\n",res.status);
+    // printf("After Getlist the status is %d\n",res.status);
     vector<string> get_t_list = res.values;
-    printf("Subs list size: %d\n",(int)get_t_list.size());
+    // printf("Subs list size: %d\n",(int)get_t_list.size());
     /*
     for(vector<string>::iterator it = get_t_list.begin();
 	it != get_t_list.end(); ++it)
@@ -782,16 +791,16 @@ public:
     KeyValueStore::GetResponse response;
     // Making the RPC Call to the Storage server
     //
-    printf("In the Get... \n");
+    // printf("In the Get... \n");
     boost::shared_ptr<TSocket> socket(new TSocket(_storageServer, _storageServerPort));
     boost::shared_ptr<TTransport> transport(new TBufferedTransport(socket));
     boost::shared_ptr<TProtocol> protocol(new TBinaryProtocol(transport));
     KeyValueStoreClient client(protocol);
     transport->open();
-    printf("Open Transport... \n");
+    // printf("Open Transport... \n");
     client.Get(response, key);
     transport->close();
-    printf("Close Transport... \n");
+    // printf("Close Transport... \n");
     return response;
   }
   // acknowledge github here  

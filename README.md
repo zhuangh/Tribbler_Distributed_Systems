@@ -8,6 +8,37 @@ hazhuang@ucsd.edu
 
 Lab2
 For CSE223B Winter 2013, Distributed Computing and Systems
+--------------------------------------------------
+--------------------------------------------------
+
+The basic idea is the distributed and not to store all the tweets in one giant list. I design pages
+for each user, each time the latest page will be loaded and feedback to the user. Or gather a group
+of pages from all user's friends and compare the timestamp, then return to the client. 
+( Attention: Key Value does not enforce the order, so we should sort the tweets from current page 
+after downloading. )
+
+My strategy
+-- Every tweets has its own hash key (by SHA1 method).
+
+-- Use A = (userid, its current message number)  
+
+-- Each user has several index table (pages) with a fixed size (e.g. 50), when post a tweets, 
+then increase A's the "current message number". It also put to a List with current index page number
+and hash key by manipulating the contents, which will help to GET the tweets from server quickly.
+
+-- GetTribbles will download user's most recently page and so the page according to the timestamp. 
+If it does not satisfy the user number requirement (e.g. 100), it will download another page of most
+recent;
+-- GetTribblesBySubscriptions method will download the latest pages from all friends of the user's. 
+Then it will sort the page according to their timestamp respectively. Then the method compared the 
+most latest one at each friends' page, and pop out the latest one. Then continue, till the number 
+requirement is met, or one of page is empty (then refill the page by downloading from corresponding 
+friend's), or the pages are eaten up.
+
+by Hao Zhuang
+
+--------------------------------------------------
+--------------------------------------------------
 
 
 These files serve as the official distribution of source code,
@@ -41,3 +72,6 @@ Running the Tribble server:
 
 Running the Tribble client (c++):
     ./tribble_client <tribbleServerIP> <tribbleServerPort>
+
+
+
