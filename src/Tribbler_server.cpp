@@ -39,17 +39,37 @@ using namespace  ::Tribbler;
 using namespace  ::KeyValueStore;
 
 class TribblerHandler : virtual public TribblerIf {
- public:
+public:
 
-  TribblerHandler(std::string storageServer, int storageServerPort) {
-    // Your initialization goes here
-    _storageServer = storageServer;
-    _storageServerPort = storageServerPort;
-  }
+    TribblerHandler(std::string storageServer, int storageServerPort) {
+	// Your initialization goes here
+	_storageServer = storageServer;
+	_storageServerPort = storageServerPort;
+    }
 
-  static bool compareTribbleFunc(const Tribbler::Tribble & a, const  Tribbler::Tribble & b){
-     return (a.posted > b.posted); 
+    static bool compareTribbleFunc(const Tribbler::Tribble & a, const  Tribbler::Tribble & b){
+	return (a.posted > b.posted); 
+    }
+    static bool compareTribbleFuncRev(const Tribbler::Tribble & a, const  Tribbler::Tribble & b){
+	return (a.posted < b.posted); 
+    }
+    /*
+  static bool compareIndices(const string & a, const string & b){
+//     return (a.posted > b.posted); 
+      ptree p1, p2;
+
+      stringstream s1(a);
+      printf("%s ", a.c_str());
+      stringstream s2(b);
+      read_json( s1, p1);
+      read_json( s2, p2);
+      int64_t a_time = (p1.get<int64_t>("time_stamp"));
+      int64_t b_time = (p2.get<int64_t>("time_stamp"));
+//      printf("a_time  = %d, b_time = %d\n", (int) a_time , (int) b_time);
+      return (  a_time > b_time  );
   }
+  */
+
 
   TribbleStatus::type CreateUser(const std::string& userid) {
     // Your implementation goes here
@@ -62,7 +82,8 @@ class TribblerHandler : virtual public TribblerIf {
     //     string uList = "USER_LIST";
     string uID = userid;
     // KeyValueStore::GetResponse res = AddToList(uList,userid);
-    KVStoreStatus::type st = Put(userid,"");
+    // stringstream tweets_num(0);   
+    KVStoreStatus::type st = Put(userid,"" /*tweets_num.str() */);
     //    KVStoreStatus::type st = AddToList(uList,userid);
     //    string vID = "000"; 
     // EKEYNOTFOUND = 2,
@@ -205,9 +226,11 @@ class TribblerHandler : virtual public TribblerIf {
     // add index to user's tribindex (userid:tribindex)
     // add tribble to hashtable (userid:hashstr,jsonstr)
 
-    string user_tribbles = userid+":tribble";
-    string timestamp = boost::lexical_cast<string> (time(NULL)); 
-    string time_tribble = timestamp+":"+tribbleContents ;
+    // string user_tribbles = userid+":tribble";
+      string grp_no = validate_id.value ;// 
+  //  string user_tribbles = userid+":tribble"+grp_no;
+   // string timestamp = boost::lexical_cast<string> (time(NULL)); 
+   // string time_tribble = timestamp+":"+tribbleContents ;
 
     ptree pt; 
     pt.put("user_id", userid);
@@ -219,7 +242,7 @@ class TribblerHandler : virtual public TribblerIf {
     write_json(marshal_tribble_tmp,pt);
     string marshal_tribble = marshal_tribble_tmp.str();
     
-    printf("tribble in json %s\n",marshal_tribble.c_str());
+//    printf("tribble in json %s\n", marshal_tribble.c_str());
 
     // for hash function just like Git, do not treat it as security protection 
     // it is tweeting ... not password .
@@ -227,14 +250,32 @@ class TribblerHandler : virtual public TribblerIf {
     // hash_sha1.process_bytes(marshal_tribble.c_str(),marshal_tribble.size());
     string hash_trib =  Sha1sum(marshal_tribble.c_str(),marshal_tribble.size());
 
-    printf("hashing tribble in json %s\n",hash_trib.c_str());
+ //   printf("hashing tribble in json %s\n",hash_trib.c_str());
 
 
     string user_trib_index = userid+":trib_index";
+
+ //   printf("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
+
+//    validate_id = Get(userid) ;
+ //   printf("before update tweets number: %s\n", (validate_id.value).c_str());
+    /*
+
+    int64_t tweets_num = boost::lexical_cast<int64_t>( validate_id.value) ;
+    printf("before update tweets number: %d\n", (int) tweets_num );
+    tweets_num++;
+    stringstream tn;
+    tn <<tweets_num;
+    Put(userid,tn.str()) ;
+    validate_id = Get(userid);
+    printf("after update tweets number: %s\n",((validate_id.value)).c_str() );
+    */
+  //  printf("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
     AddToList(user_trib_index , hash_trib);
     string user_hashtrib = userid+hash_trib;
-    KVStoreStatus::type uhres =    Put(user_hashtrib, marshal_tribble); // record the real tweets
-    printf("Put the trib in KV. The status: %d\n", uhres);
+   //  KVStoreStatus::type uhres = 
+    Put(user_hashtrib, marshal_tribble); // record the real tweets
+  //  printf("Put the trib in KV. The status: %d\n", uhres);
 
 /*
     KVStoreStatus::type st = AddToList(user_tribbles, time_tribble);
@@ -347,7 +388,11 @@ class TribblerHandler : virtual public TribblerIf {
       // Your implementation goes here
 
       printf("---------------------------------\n");
+      printf("---------------------------------\n");
+      printf("---------------------------------\n");
       printf("GetTribblesBySubscription\n");
+      printf("---------------------------------\n");
+      printf("---------------------------------\n");
       // initilizaion the subscriptions 
       // get userid -> verify the user
       // getlist(userid:subscriptions) => list_sub_string
@@ -358,6 +403,7 @@ class TribblerHandler : virtual public TribblerIf {
       if( validate_id.status == KVStoreStatus::EKEYNOTFOUND  )
 	  return ;//TribbleStatus::INVALID_USER;
       string userid_subs = userid+":subscriptions";
+
       KeyValueStore::GetListResponse  subs_string = GetList(userid_subs); 
       // the subscriptions list
       vector<string> subs = subs_string.values;
@@ -367,7 +413,8 @@ class TribblerHandler : virtual public TribblerIf {
       vector<string> subs_userid;  
       Tribbler::Tribble tmptrib_class;
       vector< Tribbler::Tribble > subs_current_trib;
-
+      vector< Tribbler::Tribble > friend_cur_trib;
+      vector< vector< Tribbler::Tribble > >  friends_arrays;
       // tmp trib
       ptree trib;
       int flag = 0;
@@ -375,8 +422,8 @@ class TribblerHandler : virtual public TribblerIf {
       KeyValueStore::GetListResponse tmp_indices; //  GetList(user_trib_index);
       KeyValueStore::GetResponse trib_marsh; //  GetList(user_trib_index);
 //      vector< vector<string> >::iterator it_ind = subs_indices.begin();  
-      for(vector<string>::iterator it = subs.begin();
-	  it != subs.end(); it++){
+      for(vector<string>::iterator it = subs.begin();it != subs.end(); it++){
+
 	  uidx = (*it)+":trib_index";
 	  // can tag the current number and transfer smaller index for subs
 	  printf("%d The subs people = %s\n", flag,uidx.c_str());
@@ -386,9 +433,69 @@ class TribblerHandler : virtual public TribblerIf {
 	  subs_index.push_back(tmp_ind.size()-1);
 	  printf("%d\n",(int) tmp_ind.size()); 
 	  printf("userid=%s, user_index size = %d\n", (subs_userid[flag]).c_str(), (int) subs_index[flag]);
+
+	  // the real infomation are stored in the indices contains time stamp, id, tweets 
 	  subs_indices.push_back(tmp_ind);
-//	  (subs_indices[i]).insert( (subs_indices[i]).begin(), tmp_ind.begin(), tmp_ind.end());
+	  // --- 
+	  // fetch in the group tweets for one friend
+	  string uid_tmp=""; 
+
+	  for(int jj = 0; jj < subs_index[flag] + 1 ; jj++){
+	      uid_tmp = subs_userid[flag] + (subs_indices[flag])[ jj ];
+	      printf("uid_tmp = %s\n", uid_tmp.c_str());
+	      trib_marsh = Get( uid_tmp );
+	      // printf("get the %s\n", (trib_marsh.value).c_str() );
+	      stringstream  tmp_msh(trib_marsh.value);
+	      printf("Read to sort %s    " , (tmp_msh.str()).c_str());
+	      read_json(tmp_msh, trib);
+
+	      tmptrib_class.contents = trib.get<string>("tribble");
+// 	      printf("tmptrib contents %s\n", (tmptrib_class.contents).c_str());
+	      tmptrib_class.userid = trib.get<string>("user_id");
+	      tmptrib_class.posted = trib.get<int64_t>("time_stamp");
+	      friend_cur_trib.push_back(tmptrib_class);
+	      // (friends_arrays[flag]).push_back(tmptrib_class);
+	  }
+	  printf("current clas s size %d",(int) friend_cur_trib.size());
+
+	  friends_arrays.push_back(friend_cur_trib);
+
+
+	  printf("before sorting ?!@!@#@!# %d,    ", (int) (friends_arrays[flag]).size() ); 
+	  // for(vector<Tribble>::iterator fit = (friends_arrays[flag]).begin();
+	    //  fit != (friends_arrays[flag]).end(); fit++){
+	  // }
+	  sort( (friends_arrays[flag]).begin(), (friends_arrays[flag]).end(), compareTribbleFuncRev);
+
+	  printf("after sorting ?!@!@#@!# %d\n  ", (int) (friends_arrays[flag]).size() ); 
+
+	  for(vector<Tribble>::iterator fit = (friends_arrays[flag]).begin();
+	      fit != (friends_arrays[flag]).end(); fit++){
+	      printf("?!@!@#@!# timestamp = %d, ", (int) ((*fit).posted) ); 
+	      printf("?!@!@#@!# content = %s\n", ((*fit).contents).c_str() ); 
+	  }
+// --- 
+
+
+	  //	  (subs_indices[i]).insert( (subs_indices[i]).begin(), tmp_ind.begin(), tmp_ind.end());
 //	  (*it_ind)=(tmp_ind);
+
+/*	  printf("before sort\n");
+	  for( vector<string>::iterator itt = (subs_indices[flag]).begin(); itt!= (subs_indices[flag]).end(); itt++  ){
+	      printf("%s  ", (*itt).c_str());
+	  }
+	  printf("\n");
+	  printf("\n");
+	  printf("begin rearrange !! \n");
+
+	  sort( (subs_indices[flag]).begin(), (subs_indices[flag]).end(),compareIndices);
+	  for( vector<string>::iterator itt = (subs_indices[flag]).begin(); itt!= (subs_indices[flag]).end(); itt++  ){
+	      printf("%s  ", (*itt).c_str());
+	  }
+
+	  printf("after  sort\n");
+	  printf("\n");
+ */
 	  printf("subs_indices's size = %d\n",(int)  (subs_indices).size()); 
 	  printf("current element of subs_indices's size = %d\n",(int)  (subs_indices[flag]).size()); 
 	  printf("\n\n");
@@ -397,19 +504,28 @@ class TribblerHandler : virtual public TribblerIf {
 	  // add non empty tribbers from friends
 	  if(subs_index[flag] >= 0 ){
 	      printf("subs_index[flag] = %d\n", (int) subs_index[flag]);
+	      
 	      // reduce the index to get the last element
 
-	      string uid_tmp = subs_userid[flag] + (subs_indices[flag])[ subs_index[flag] ];
-	      printf("uid_tmp = %s\n", uid_tmp.c_str());
-	      trib_marsh = Get( uid_tmp );
+//	      string uid_tmp = subs_userid[flag] + (subs_indices[flag])[ subs_index[flag] ];
+//	      printf("uid_tmp = %s\n", uid_tmp.c_str());
+//	      trib_marsh = Get( uid_tmp );
 	      // printf("get the %s\n", (trib_marsh.value).c_str() );
-	      stringstream tmp_msh(trib_marsh.value);
-	      read_json(tmp_msh, trib);
-	      tmptrib_class.contents = trib.get<string>("tribble");
-	      printf("tmptrib contents %s\n", (tmptrib_class.contents).c_str());
-	      tmptrib_class.userid = trib.get<string>("user_id");
-	      tmptrib_class.posted = trib.get<int64_t>("time_stamp");
+//	      stringstream tmp_msh(trib_marsh.value);
+//	      read_json(tmp_msh, trib);
+
+	      printf("????????????????????????????????????????The friends array size %d and subs_index is %d,   ", 
+		     (int ) (friends_arrays[flag]).size(), (int) subs_index[flag]);
+	      printf("!~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ ~~~~ \n\n %s ",( (( friends_arrays[flag]).at(subs_index[flag])).contents).c_str());
+	      tmptrib_class.contents = (( friends_arrays[flag]).at(subs_index[flag])).contents;
+	      // trib.get<string>("tribble");// 	      printf("tmptrib contents %s\n", (tmptrib_class.contents).c_str());
+	      tmptrib_class.userid =( (friends_arrays[flag]).at(subs_index[flag])).userid ;// trib.get<string>("user_id");
+	      tmptrib_class.posted =( (friends_arrays[flag]).at(subs_index[flag])).posted  ;// trib.get<int64_t>("time_stamp");
+
 	      subs_current_trib.push_back(tmptrib_class);
+//	      tmptrib_class =l/
+//	       subs_current_trib.push_back(friends_arrays[flag])[ subs_index[flag] ];
+
 	      printf("tmptrib contents after getting !! %s\n", 
 		     (subs_current_trib[flag].contents).c_str());
 //	      subs_index[flag]-- ;
@@ -441,24 +557,28 @@ class TribblerHandler : virtual public TribblerIf {
 	      subs_index[min_int]--;
 	      if(subs_index[min_int] > -1){ // current index > -1 means there still exist tribbles
 		  string uid_tmp = subs_userid[min_int] + (subs_indices[min_int])[ subs_index[min_int] ];
-		  trib_marsh = Get( uid_tmp );
-		  stringstream tmp_msh(trib_marsh.value);
-		  read_json(tmp_msh, trib);
-		  tmptrib_class.contents = trib.get<string>("tribble");
-		  printf("tmptrib contents %s\n", (tmptrib_class.contents).c_str());
-		  tmptrib_class.userid = trib.get<string>("user_id");
-		  tmptrib_class.posted = trib.get<int64_t>("time_stamp");
+		  //		  trib_marsh = Get( uid_tmp );
+		  //		  stringstream tmp_msh(trib_marsh.value);
+		  //		  read_json(tmp_msh, trib);
+		  //		  tmptrib_class.contents = trib.get<string>("tribble");
+		  //		  printf("tmptrib contents %s\n", (tmptrib_class.contents).c_str());
+		  //		  tmptrib_class.userid = trib.get<string>("user_id");
+		//  tmptrib_class.posted =  ;// trib.get<int64_t>("time_stamp");
+		  tmptrib_class.contents = (( friends_arrays[min_int]).at(subs_index[min_int])).contents;
+		  // trib.get<string>("tribble");// 	      printf("tmptrib contents %s\n", (tmptrib_class.contents).c_str());
+		  tmptrib_class.userid =( (friends_arrays[min_int]).at(subs_index[min_int])).userid ;// trib.get<string>("user_id");
+		  tmptrib_class.posted =( (friends_arrays[min_int]).at(subs_index[min_int])).posted  ;// trib.get<int64_t>("time_stamp");
 		  subs_current_trib[min_int] = tmptrib_class;
 	      }
 	  }
 	  else {
 	      _return.status = TribbleStatus::OK;
-	      sort( (_return.tribbles).begin(), (_return.tribbles).end(), compareTribbleFunc);
+//	      sort( (_return.tribbles).begin(), (_return.tribbles).end(), compareTribbleFunc);
 	      return;
 	  }
       }
       _return.status = TribbleStatus::OK;
-      sort( (_return.tribbles).begin(), (_return.tribbles).end(), compareTribbleFunc);
+//      sort( (_return.tribbles).begin(), (_return.tribbles).end(), compareTribbleFunc);
 /*
       string user_get_friends = userid + ":friends_tweets" ;	
       printf("fetch %s\n", user_get_friends.c_str());

@@ -6,12 +6,17 @@
 #include <protocol/TBinaryProtocol.h>
 #include <iostream>
 
+#include <boost/lexical_cast.hpp>
+
 using namespace apache::thrift;
 using namespace apache::thrift::protocol;
 using namespace apache::thrift::transport;
 
 using namespace Tribbler;
 using namespace std;
+
+
+using boost::lexical_cast;
 
 void printSubscriptions(SubscriptionResponse& sr, string user) {
     unsigned int size = sr.subscriptions.size();
@@ -101,6 +106,11 @@ int main(int argc, char **argv) {
     TribbleResponse tr_alice;
     TribbleStatus::type ts_post;
     ts_post = client.PostTribble("alice", "What a beautiful day!");
+    for(int i = 0; i < 1000 ; i++ )
+    {
+	string tweet = "What a beautiful day! "+ boost::lexical_cast<string>(time(NULL));
+	ts_post = client.PostTribble("alice", tweet);
+    }
     if (ts_post != TribbleStatus::OK) {
         cout << "Alice could not post "
              << "Error code: " << ts_post << endl;
