@@ -22,7 +22,8 @@ struct TribbleStatus {
     EEXISTS = 2,
     INVALID_USER = 3,
     INVALID_SUBSCRIBETO = 4,
-    NOT_IMPLEMENTED = 5
+    NOT_IMPLEMENTED = 5,
+    STORE_FAILED = 6 // forget to add 
   };
 };
 

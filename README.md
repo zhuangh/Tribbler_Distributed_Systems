@@ -11,9 +11,11 @@ For CSE223B Winter 2013, Distributed Computing and Systems
 --------------------------------------------------
 --------------------------------------------------
 
-The basic idea is the distributed and not to store all the tweets in one giant list. I design pages
-for each user, each time the latest page will be loaded and feedback to the user. Or gather a group
-of pages from all user's friends and compare the timestamp, then return to the client. 
+The basic idea is the distributed the tweet via pages via index which uses SHA1 
+(not to store all the tweets in one giant list). 
+
+I design pages for each user, each time the latest page will be loaded and feedback to the user. Or gather a group of pages from all user's friends and compare the timestamp, then return to the client. 
+
 ( Attention: Key Value does not enforce the order, so we should sort the tweets from current page 
 after downloading. )
 
