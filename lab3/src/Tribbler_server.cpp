@@ -23,6 +23,7 @@ using boost::shared_ptr;
 using namespace std;
 using namespace  ::Tribbler;
 using namespace  ::KeyValueStore;
+#define DEBUG_TS
 
 class TribblerHandler : virtual public TribblerIf {
  public:
@@ -36,7 +37,14 @@ class TribblerHandler : virtual public TribblerIf {
   TribbleStatus::type CreateUser(const std::string& userid) {
     // Your implementation goes here
     printf("CreateUser\n");
-    return TribbleStatus::NOT_IMPLEMENTED;
+    KeyValueStore::GetResponse validate_id = Get(userid);
+    if( validate_id.status != KVStoreStatus::EKEYNOTFOUND  )
+	return TribbleStatus::EEXISTS ;
+
+    string uID = userid;
+    string tweets_num = "0";   
+    Put(userid,tweets_num);
+    return TribbleStatus::OK;
   }
 
   TribbleStatus::type AddSubscription(const std::string& userid, const std::string& subscribeto) {

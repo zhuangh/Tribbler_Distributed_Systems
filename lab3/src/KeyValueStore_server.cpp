@@ -16,6 +16,7 @@ using boost::shared_ptr;
 using namespace std;
 
 using namespace  ::KeyValueStore;
+#define DEBUG_KV
 
 class KeyValueStoreHandler : virtual public KeyValueStoreIf {
  public:
@@ -23,6 +24,9 @@ class KeyValueStoreHandler : virtual public KeyValueStoreIf {
     // Your initialization goes here
     _id = atoi(argv[1]);
     int index = 0;
+#ifdef DEBUG_KV 
+    printf("The number of KV StoreHandler %d\n", argc); 
+#endif
 
     for(int i = 3; i+1 < argc; i += 2) {
       if (index == _id) {
@@ -38,6 +42,18 @@ class KeyValueStoreHandler : virtual public KeyValueStoreIf {
   void Get(GetResponse& _return, const std::string& key) {
     // Your implementation goes here
     printf("Get\n");
+#ifdef DEBUG_KV
+    printf("KV get %s\n", key.c_str() );
+#endif
+    // for(int i = 3; i+1 < argc; i += 2) {
+    for(vector< pair< string, int> >::iterator it = _backendServerVector.begin(); 
+	it != _backendServerVector.end(); 
+	it++)
+    {
+//	_backendServerVector;
+	cout << "Update Backend server at: "<<endl;
+	// << peer_ip << " on port: " << peer_port << endl;
+    }
     _return.status =  KVStoreStatus::NOT_IMPLEMENTED;
   }
 
@@ -50,6 +66,7 @@ class KeyValueStoreHandler : virtual public KeyValueStoreIf {
   KVStoreStatus::type Put(const std::string& key, const std::string& value, const std::string& clientid) {
     // Your implementation goes here
     printf("Put\n");
+
     return KVStoreStatus::NOT_IMPLEMENTED;
   }
 
