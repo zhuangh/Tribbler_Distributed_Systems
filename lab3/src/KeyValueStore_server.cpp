@@ -6,6 +6,7 @@
 #include <thrift/server/TSimpleServer.h>
 #include <thrift/transport/TServerSocket.h>
 #include <thrift/transport/TBufferTransports.h>
+#include <boost/unordered_map.hpp>
 
 using namespace ::apache::thrift;
 using namespace ::apache::thrift::protocol;
@@ -14,8 +15,13 @@ using namespace ::apache::thrift::server;
 
 using boost::shared_ptr;
 using namespace std;
-
 using namespace  ::KeyValueStore;
+using boost::unordered_map;
+
+
+typedef boost::unordered_map<std::string, std::string > KVMap;
+typedef boost::unordered_map<std::string, std::vector<string> > KVMapList;
+
 #define DEBUG_KV
 
 class KeyValueStoreHandler : virtual public KeyValueStoreIf {
@@ -45,46 +51,114 @@ class KeyValueStoreHandler : virtual public KeyValueStoreIf {
 #ifdef DEBUG_KV
     printf("KV get %s\n", key.c_str() );
 #endif
-    // for(int i = 3; i+1 < argc; i += 2) {
-    for(vector< pair< string, int> >::iterator it = _backendServerVector.begin(); 
-	it != _backendServerVector.end(); 
-	it++)
-    {
-//	_backendServerVector;
-	cout << "Update Backend server at: "<<endl;
-	// << peer_ip << " on port: " << peer_port << endl;
-    }
-    _return.status =  KVStoreStatus::NOT_IMPLEMENTED;
+    
+    if(kv_store.find(key) != kv_store.end())
+     	_return.status = KVStoreStatus::EKEYNOTFOUND;
+    else 
+	_return.status = KVStoreStatus::EITEMEXISTS; // duplicate in lists
   }
 
   void GetList(GetListResponse& _return, const std::string& key) {
     // Your implementation goes here
     printf("GetList\n");
+
     _return.status =  KVStoreStatus::NOT_IMPLEMENTED;
   }
 
   KVStoreStatus::type Put(const std::string& key, const std::string& value, const std::string& clientid) {
     // Your implementation goes here
     printf("Put\n");
-
-    return KVStoreStatus::NOT_IMPLEMENTED;
+    bool found = (kv_store.find(key)!=kv_store.end());
+    kv_store.insert(key,value);	
+    if(found){
+        string & tmp = kv_store.at(key);	
+	tmp = value; 
+#ifdef DEBUG_KV
+	cout<<"after change: "<< kv_store.at(key)<<endl;
+#endif
+	return KVStoreStatus::EITEMEXISTS;
+    }
+    else
+    {
+	kv_store.insert(key,value);
+	return KVStoreStatus::EKEYNOTFOUND;
+    }
+    return KVStoreStatus::EPUTFAILED;
   }
 
   KVStoreStatus::type AddToList(const std::string& key, const std::string& value, const std::string& clientid) {
-    // Your implementation goes here
-    printf("AddToList\n");
-    return KVStoreStatus::NOT_IMPLEMENTED;
+      // Your implementation goes here
+      printf("AddToList\n");
+
+      bool found = ( kv_list.find(key) != kv_list.end()); 
+      if(found)
+      {
+	  vector<string> values_list = kv_list.at(key);
+	  values_list.push_back(value);
+#ifdef DEBUG_KV
+	  string t_value = "after push "+value;
+	  vector<string> values_list_test = kv_list.at(key);
+	  vector<string>::iterator it = (values_list.end()-1);
+	  cout<<"test after push and modified the value, that should not change the list item: "<<(*it)<<endl;
+#endif
+	  return KVStoreStatus::EITEMEXISTS;
+      }
+      else{ 
+	  vector<string> values;
+	  values.push_back(value);
+	  kv_list.insert(key,values);
+	  // not find the key insert the key and first elment
+	  return KVStoreStatus::EKEYNOTFOUND;
+      }
+      return KVStoreStatus::EPUTFAILED;
   }
 
   KVStoreStatus::type RemoveFromList(const std::string& key, const std::string& value, const std::string& clientid) {
     // Your implementation goes here
     printf("RemoveFromList\n");
-    return KVStoreStatus::NOT_IMPLEMENTED;
+    bool found = ( kv_list.find(key) != kv_list.end()); 
+    // Key exist 
+    //    item exist
+    //    item doesnot exist
+    //
+    // Key dosnot exist 
+
+    // if(found){
+	// std::pair< string, vector<string> > key_values ; 
+	// key_values =  kv_list.equal_range(key);
+	vector<string > key_values =  kv_list.at(key);
+	for(vector<string>::iterator it = key_values.begin();
+	        it != key_values.end(); it++){
+	       // suppose not duplicated item  	
+#ifdef DEBUG_KV
+	    cout<< (*it)<<" ";
+#endif
+	       	
+	    }
+
+#ifdef DEBUG_KV
+	cout<<endl
+#endif
+	    /*
+	else {
+
+	}
+    }
+    else return KVStoreStatus::EITEMNOTFOUND;
+    */
+
+    return KVStoreStatus::OK;
   }
 
   private:
     int _id;
     vector < pair<string, int> > _backendServerVector;
+
+    // the storage for Key and Value
+    KVMap kv_store;
+    KVMapList kv_list;
+
+
 
 };
 

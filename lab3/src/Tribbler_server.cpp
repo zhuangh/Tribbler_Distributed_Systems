@@ -13,6 +13,8 @@
 #include <thrift/transport/TServerSocket.h>
 #include <thrift/transport/TBufferTransports.h>
 
+#include <map>
+
 using namespace ::apache::thrift;
 using namespace ::apache::thrift::protocol;
 using namespace ::apache::thrift::transport;
@@ -38,8 +40,11 @@ class TribblerHandler : virtual public TribblerIf {
     // Your implementation goes here
     printf("CreateUser\n");
     KeyValueStore::GetResponse validate_id = Get(userid);
+
     if( validate_id.status != KVStoreStatus::EKEYNOTFOUND  )
+    {
 	return TribbleStatus::EEXISTS ;
+    }
 
     string uID = userid;
     string tweets_num = "0";   
@@ -96,6 +101,19 @@ class TribblerHandler : virtual public TribblerIf {
     st = kv_client.AddToList(key, value, clientid);
     transport->close();
     return st;
+  }
+
+  KeyValueStore::GetListResponse GetList(std::string key) {
+      KeyValueStore::GetListResponse response;
+      // Making the RPC Call to the Storage server
+      boost::shared_ptr<TSocket> socket(new TSocket(_kvServer, _kvServerPort));
+      boost::shared_ptr<TTransport> transport(new TBufferedTransport(socket));
+      boost::shared_ptr<TProtocol> protocol(new TBinaryProtocol(transport));
+      KeyValueStoreClient client(protocol);
+      transport->open();
+      client.GetList(response, key);
+      transport->close();
+      return response;
   }
 
   KVStoreStatus::type RemoveFromList(std::string key, std::string value) {
