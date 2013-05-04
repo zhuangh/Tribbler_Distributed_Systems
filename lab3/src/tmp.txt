@@ -15,7 +15,7 @@
 		  boost::shared_ptr<TProtocol> protocol(new TBinaryProtocol(transport));
 		  KeyValueStoreClient kv_client(protocol);
 		  transport->open();
-		  kv_client.KVPut(key,value, clientid);
+		  kv_client.KVRemoveFromList(key,value, clientid);
 		  transport->close();
 	      } catch( TTransportException e){
 	      }

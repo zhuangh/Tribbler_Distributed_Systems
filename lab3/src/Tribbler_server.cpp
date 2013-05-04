@@ -60,10 +60,27 @@ class TribblerHandler : virtual public TribblerIf {
 
 // from lab2
     static bool compareTribbleFunc(const Tribbler::Tribble & a, const  Tribbler::Tribble & b){
-	return (a.posted > b.posted); 
+	if( ( (a.posted).size() > 0) && (a.posted).size() == (b.posted).size()){
+	    for(vector<int64_t>::const_iterator ita = (a.posted).begin(), itb = (b.posted).begin();
+		( ita != (a.posted).end() && itb != (a.posted).end());
+		ita++, itb++ ){
+		if( *ita < *itb)   return false;		
+	    }
+	}  
+	return true;
+	// 	return (a.posted > b.posted); 
     }
     static bool compareTribbleFuncRev(const Tribbler::Tribble & a, const  Tribbler::Tribble & b){
-	return (a.posted < b.posted); 
+
+	if( ( (a.posted).size() > 0) && (a.posted).size() == (b.posted).size()){
+	    for(vector<int64_t>::const_iterator ita = (a.posted).begin(), itb = (b.posted).begin();
+		( ita != (a.posted).end() && itb != (a.posted).end());
+		ita++, itb++ ){
+		if( *ita > *itb)   return false;		
+	    }
+	}
+	// return (a.posted < b.posted); 
+	return true;
     }
     //from lab2
  
@@ -214,6 +231,10 @@ class TribblerHandler : virtual public TribblerIf {
     pt.put("user_id", userid);
     pt.put("time_stamp", boost::lexical_cast<string> (ts.tv_sec * 1000000000 + ts.tv_nsec) );
     pt.put("tribble", tribbleContents);
+    
+    vector<int64_t> tp_posted ;
+//    tp_posted.resize();
+ //   pt.put("vec_timestamp", tp_posted );
 //    write_json("tribble.json",pt);
 //    string marshal_tribble="";
     std::stringstream marshal_tribble_tmp;
@@ -305,19 +326,8 @@ class TribblerHandler : virtual public TribblerIf {
   }
 
   void GetTribbles(TribbleResponse& _return, const std::string& userid) {
-    // Your implementation goes here
-
-
-
       printf("GetTribbles\n");
       // Your implementation goes here
-      // printf("---------------------------------\n");
-      // printf("---------------------------------\n");
-      // printf("---------------------------------\n");
-      // printf("---------------------------------\n");
-      // printf("---------------------------------\n");
-      // printf("---------------------------------\n");
-      
  
       // get userid:tribindex => list
       // get userid:list(i) =>  jsontrib 
@@ -384,7 +394,24 @@ class TribblerHandler : virtual public TribblerIf {
 		  tribstr = trib.get<string>("tribble");
 		  tmptrib_class.contents = tribstr;
 		  tmptrib_class.userid = trib.get<string>("user_id");
-	//	  tmptrib_class.posted = trib.get<int64_t>("time_stamp");
+		  int backend_num = trib.get<int>("backend_num"); 
+		  (tmptrib_class.posted).resize(backend_num);
+		  // vector<int64_t>::iterator it_posted = (tmptrib_class.posted).begin(); 
+		  for(int bi = 1 ;  bi <= backend_num ; bi++ ) {
+		      (tmptrib_class.posted)[bi-1] = ( boost::lexical_cast<int64_t> ( trib.get<string> ("vec_timestamp:"+boost::lexical_cast<string>(bi) ))) ;
+		      // it_posted++; 
+		  }
+
+		  
+#ifdef DEBUG_TS
+		  
+		  cout<<tmptrib_class.userid<<"'s posted time stamp: "<<endl;
+		  int ii = 1;
+		  for(vector<int64_t>::iterator ptt = (tmptrib_class.posted).begin(); ptt != (tmptrib_class.posted).end(); ptt++){
+		      cout<<ii<<": "<<*ptt<<endl;
+		      ii++;
+		  } 
+#endif
 		  // insert a binarry tree 
 		  // remove the push back here
 		  (_return.tribbles).push_back(tmptrib_class);
@@ -413,18 +440,8 @@ class TribblerHandler : virtual public TribblerIf {
 
   void GetTribblesBySubscription(TribbleResponse& _return, const std::string& userid) {
     // Your implementation goes here
-      //printf("---------------------------------\n");
-      //printf("---------------------------------\n");
-     // printf("---------------------------------\n");
       printf("GetTribblesBySubscription\n");
-      // printf("---------------------------------\n");
-      // printf("---------------------------------\n");
-      // initilizaion the subscriptions 
-      // get userid -> verify the user
-      // getlist(userid:subscriptions) => list_sub_string
-      // getlist(list_sub_string(i):tribindex) => list_sub_string(i).Indices 
-
-      KeyValueStore::GetResponse validate_id = Get(userid);
+            KeyValueStore::GetResponse validate_id = Get(userid);
       // printf("Validate the user  %d\n",validate_id.status);
       if( validate_id.status == KVStoreStatus::EKEYNOTFOUND  )
       {
@@ -479,6 +496,7 @@ class TribblerHandler : virtual public TribblerIf {
 	     // 	      printf("tmptrib contents %s\n", (tmptrib_class.contents).c_str());
 	     tmptrib_class.userid =(*it) ;// trib.get<string>("user_id");
 //	     tmptrib_class.posted = 0 ;// trib.get<int64_t>("time_stamp");
+	     (tmptrib_class.posted).resize(0);
 	     subs_current_trib.push_back(tmptrib_class); 
 	 }
 	 else {
@@ -513,134 +531,126 @@ class TribblerHandler : virtual public TribblerIf {
 		      tmptrib_class.contents = "";//trib.get<string>("tribble");
 		      // 	      printf("tmptrib contents %s\n", (tmptrib_class.contents).c_str());
 		      tmptrib_class.userid = "";//trib.get<string>("user_id");
-//		      tmptrib_class.posted = 0;// trib.get<int64_t>("time_stamp");
+		      (tmptrib_class.posted).resize(0,0)  ;// trib.get<int64_t>("time_stamp");
 
 		  }
 		  else{
-		      // printf("get the %s\n", (trib_marsh.value).c_str() );
+#ifdef DEBUG_TS
+		      cout<< "Get tweets from "<<uid_tmp<<" : "<<trib_marsh.value<<endl;
+#endif 
 		      stringstream  tmp_msh(trib_marsh.value);
-		      //	      printf("Read to sort %s    " , (tmp_msh.str()).c_str());
 		      read_json(tmp_msh, trib);
 		      tmptrib_class.contents = trib.get<string>("tribble");
-		      // 	      printf("tmptrib contents %s\n", (tmptrib_class.contents).c_str());
 		      tmptrib_class.userid = trib.get<string>("user_id");
-//		      tmptrib_class.posted = trib.get<int64_t>("time_stamp");
+		      int backend_num = trib.get<int>("backend_num"); 
+		      (tmptrib_class.posted).resize( backend_num);
+		      for(int bi = 1 ;  bi <= backend_num ; bi++ ) {
+			  (tmptrib_class.posted)[bi-1] =( boost::lexical_cast<int64_t> ( trib.get<string> ("vec_timestamp:"+boost::lexical_cast<string>(bi) ))) ;
+#ifdef DEBUG_TS
+			  cout<< tmptrib_class.userid  <<" time vector : "<<bi<<" = "<<tmptrib_class.posted[bi-1]<<endl;
+#endif
+			  // it_posted++; 
+		      }
 
 		      (friends_arrays[flag])[jj]=tmptrib_class;// subs_index[flag]+1);
+#ifdef DEBUG_TS
+
+		      cout<<"The user"<< ((friends_arrays[flag])[jj]).userid<<" : ";
+		      for(int bi = 1; bi <= backend_num ; bi++){
+			  cout<<bi<<": "<<(((friends_arrays[flag])[jj]).posted)[bi-1]<<endl;
+		      
+		      }
+#endif
+
 		  }
-		  //	      friend_cur_trib.push_back(tmptrib_class);
-		  // (friends_arrays[flag]).push_back(tmptrib_class);
 	      }
-	      //	  printf("current clas s size %d",(int) friend_cur_trib.size());
 
-	      //	  friends_arrays.push_back(friend_cur_trib);
-
-
-	      //	  printf("before sorting ?!@!@#@!# %d,    ", (int) (friends_arrays[flag]).size() ); 
-	      // for(vector<Tribble>::iterator fit = (friends_arrays[flag]).begin();
-	      //  fit != (friends_arrays[flag]).end(); fit++){
-	      // }
 	      sort( (friends_arrays[flag]).begin(), 
 		    (friends_arrays[flag]).end(), compareTribbleFuncRev);
+#ifdef DEBUG_TS
+	      cout<<"Finish one friend!"<<endl;
+#endif
 	  }
-
-	  /*
-	     printf("after sorting ?!@!@#@!# %d\n  ", (int) (friends_arrays[flag]).size() ); 
-
-	  for(vector<Tribble>::iterator fit = (friends_arrays[flag]).begin();
-	      fit != (friends_arrays[flag]).end(); fit++){
-	      printf("?!@!@#@!# timestamp = %d, ", (int) ((*fit).posted) ); 
-	      printf("?!@!@#@!# content = %s\n", ((*fit).contents).c_str() ); 
-	  }
-	  */
-// --- 
-
-
-	  //	  (subs_indices[i]).insert( (subs_indices[i]).begin(), tmp_ind.begin(), tmp_ind.end());
-//	  (*it_ind)=(tmp_ind);
-
-/*	  printf("before sort\n");
-	  for( vector<string>::iterator itt = (subs_indices[flag]).begin(); itt!= (subs_indices[flag]).end(); itt++  ){
-	      printf("%s  ", (*itt).c_str());
-	  }
-	  printf("\n");
-	  printf("\n");
-	  printf("begin rearrange !! \n");
-
-	  sort( (subs_indices[flag]).begin(), (subs_indices[flag]).end(),compareIndices);
-	  for( vector<string>::iterator itt = (subs_indices[flag]).begin(); itt!= (subs_indices[flag]).end(); itt++  ){
-	      printf("%s  ", (*itt).c_str());
-	  }
-
-	  printf("after  sort\n");
-	  printf("\n");
- */
-	  // printf("subs_indices's size = %d\n",(int)  (subs_indices).size()); 
-	  // printf("current element of subs_indices's size = %d\n",(int)  (subs_indices[flag]).size()); 
-	 // printf("\n\n");
 
 	  // initized the friends
 	  // add non empty tribbers from friends
 	  if(subs_index[flag] >= 0 ){
-	  //    printf("subs_index[flag] = %d\n", (int) subs_index[flag]);
-	      
-	      // reduce the index to get the last element
-
-	      //	      string uid_tmp = subs_userid[flag] + (subs_indices[flag])[ subs_index[flag] ];
-	      //	      printf("uid_tmp = %s\n", uid_tmp.c_str());
-	      //	      trib_marsh = Get( uid_tmp );
-	      // printf("get the %s\n", (trib_marsh.value).c_str() );
-	      //	      stringstream tmp_msh(trib_marsh.value);
-	      //	      read_json(tmp_msh, trib);
-	      //printf("????????????????????????????????????????The friends array size %d and subs_index is %d,   ", 
-	      //     (int ) (friends_arrays[flag]).size(), (int) subs_index[flag]);
-	      //  printf("!~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ ~~~~ \n\n %s ",
-	      //  ( (( friends_arrays[flag]).at(subs_index[flag])).contents).c_str());
 	      tmptrib_class.contents = (( friends_arrays[flag]).at(subs_index[flag])).contents;
-	      // trib.get<string>("tribble");
-	      //      printf("tmptrib contents %s\n", (tmptrib_class.contents).c_str());
 	      tmptrib_class.userid =( (friends_arrays[flag]).at(subs_index[flag])).userid ;
-	      // trib.get<string>("user_id");
-//	      tmptrib_class.posted =( (friends_arrays[flag]).at(subs_index[flag])).posted  ;
-	      // trib.get<int64_t>("time_stamp");
-	      subs_current_trib.push_back(tmptrib_class);
-	      //	      tmptrib_class =l/
-	      //	       subs_current_trib.push_back(friends_arrays[flag])[ subs_index[flag] ];
+	      int backend_num = (( (friends_arrays[flag]).at(subs_index[flag])).posted).size() ;
+	      // (tmptrib_class.posted).resize(  (( (friends_arrays[flag]).at(subs_index[flag])).posted).size() ) ;
+	      (tmptrib_class.posted).resize(backend_num);//  (( (friends_arrays[flag]).at(subs_index[flag])).posted).size() ) ;
 
-	      //	      printf("tmptrib contents after getting !! %s\n", 
-	      //		     (subs_current_trib[flag].contents).c_str());
-	      //	      subs_index[flag]-- ;
-	      //	      printf("after reduce subs_index[flag] = %d\n",(int) subs_index[flag]);
+#ifdef DEBUG_TS
+	      cout<<"test tmep Class "<<endl;
+#endif 
+	      for(int bi = 1 ;  bi <= backend_num ; bi++ ) {
+		  (tmptrib_class.posted)[bi-1]= (( (friends_arrays[flag]).at(subs_index[flag])).posted)[bi-1]  ;
+#ifdef DEBUG_TS
+		  cout<< tmptrib_class.userid  <<" time vector : "<<bi<<" = "<<tmptrib_class.posted[bi-1]<<endl;
+#endif
+		  // it_posted++; 
+	      }
+
+#ifdef DEBUG_TS
+	      cout<<"test update Class "<<endl;
+#endif 
+
+	      subs_current_trib.push_back(tmptrib_class);
+	      vector<Tribble>::iterator tmpst =  subs_current_trib.end()-1;
+	      for(int bi = 1 ;  bi <= backend_num ; bi++ ) {
+#ifdef DEBUG_TS
+
+		  cout<< tmpst->userid  <<" time vector : "<<bi<<" = "<<((*tmpst).posted)[bi-1]<<endl;
+#endif
+		  // it_posted++; 
+	      }
 
 	  }// 
-
-	  // subs_index[flag]--;
-	  // clean the node index by reduce the position
-	  // need to reduce all, otherwise 0->-1, and -1->-1
 	  flag++;
       }
 
-      //compare the current subscrip and find out the current latest, and iteration till 100
-      //      printf("The Flag final value = %d !!!!!!!!!!!!!!!!!!!!\n",flag);
 
       int cnt_subs_trib = 100; 
       int min_int  = -1;
       // the current minimum position in friends 
       // -1 means begin the scan
 
+#ifdef DEBUG_TS
+      cout<<"There are "<<flag<<" ppls"<<endl;
+#endif
       
       for(int i = 0 ; i < cnt_subs_trib ; i++){
 	  min_int  = -1;
+
 	  for (int j = 0; j<flag ; j++){
-	      //	      printf("subs_index[%d]=%d    ", j,subs_index[j]);
-	      if( ( min_int == -1 && subs_index[j] > -1 ) 
-		  || (   min_int > -1 &&  subs_index[j] > -1  
-		//	&& (subs_current_trib[j].posted > subs_current_trib[min_int].posted )
-			) )
+
+	      if( ( min_int == -1 && subs_index[j] > -1 )) 
 	      {
 		  min_int = j;
 
 	      }
+	      else if(  (   min_int > -1 &&  subs_index[j] > -1 ) )
+	      {
+		  if ( compareTribbleFunc(subs_current_trib[j] , subs_current_trib[min_int]) ){
+		      min_int = j;
+		  }
+#ifdef DEBUG_TS
+		  //	      printf("subs_index[%d]=%d    ", j,subs_index[j]);
+		  cout<<"The compare result: "<<compareTribbleFunc(subs_current_trib[j] , subs_current_trib[min_int])<<endl;
+		  cout<<"The compare result: flush size: "<<(subs_current_trib[j].posted).size()<<"  min: ,"<< (subs_current_trib[min_int].posted).size()<<endl;
+		  /*
+		  vector<int64_t>::iterator ita = (subs_current_trib[j].posted).begin();
+		  vector<int64_t>::iterator itb =(subs_current_trib[min_int].posted).begin() ;
+
+		  for( ; ( ita != (subs_current_trib[j].posted).end() && itb!= (subs_current_trib[min_int].posted).end()) ;
+		       ita++, itb++){
+		      cout<<*ita<<" > "<< *itb<<endl;
+		  }
+		  */
+#endif 
+	      }
+
 	      /*
 	      if(subs_index[j]>-1)
 	      {
@@ -699,35 +709,25 @@ class TribblerHandler : virtual public TribblerIf {
 		      // printf("tmptrib contents %s\n", (tmptrib_class.contents).c_str());
 		      tmptrib_class.userid = trib.get<string>("user_id");
 //		      tmptrib_class.posted = trib.get<int64_t>("time_stamp");
+		      int backend_num = trib.get<int>("backend_num");
+		      (tmptrib_class.posted).resize( backend_num, 0);
+		      // vector<int64_t>::iterator it_posted = (tmptrib_class.posted).begin(); 
+		      for(int bi = 1 ;  bi <= backend_num ; bi++ ) {
+			  (tmptrib_class.posted)[bi-1] = ( boost::lexical_cast<int64_t> ( trib.get<string> ("vec_timestamp:"+boost::lexical_cast<string>(bi) ))) ;
+#ifdef DEBUG_TS
+			  cout<< tmptrib_class.userid  <<" time vector : "<<bi<<" = "<<tmptrib_class.posted[bi-1]<<endl;
+#endif
+			  // it_posted++; 
+		      }
+
+
 		      // friend_cur_trib.push_back(tmptrib_class);
 		      // (friends_arrays[min_int]).push_back(tmptrib_class);
 		      (friends_arrays[min_int])[jj]= tmptrib_class ;
 		  }
 
-		  //		  printf("current clas s size %d",(int) friend_cur_trib.size());
-
-		  // friends_arrays[min_int]=friend_cur_trib;
-		  //		  printf("before sorting ?!@!@#@!# %d,    ", (int) (friends_arrays[flag]).size() ); 
-		  // for(vector<Tribble>::iterator fit = (friends_arrays[flag]).begin();
-		  //  fit != (friends_arrays[flag]).end(); fit++){
-		  // }
-
 		  sort( (friends_arrays[min_int]).begin(),
 			(friends_arrays[min_int]).end(), compareTribbleFuncRev);
-
-		  /*
-		  tmptrib_class.contents =
-		      (( friends_arrays[min_int]).at(subs_index[min_int])).contents;
-		  // trib.get<string>("tribble");
-		  //      printf("tmptrib contents %s\n", (tmptrib_class.contents).c_str());
-		  tmptrib_class.userid =
-		      ( (friends_arrays[min_int]).at(subs_index[min_int])).userid ;
-		  // trib.get<string>("user_id");
-		  tmptrib_class.posted =
-		      ( (friends_arrays[min_int]).at(subs_index[min_int])).posted  ;
-		  // trib.get<int64_t>("time_stamp");
-		  subs_current_trib[min_int] = (tmptrib_class);
-		  */
 
 	      }
 	      // next update the min_int  after pop out 
@@ -735,23 +735,36 @@ class TribblerHandler : virtual public TribblerIf {
 	      if(subs_index[min_int] > -1       )
 	      { // current index > -1 means there still exist tribbles
 		 //  string uid_tmp = subs_userid[min_int] + (subs_indices[min_int])[ subs_index[min_int] ];
-		  
-		  //		  trib_marsh = Get( uid_tmp );
-		  //		  stringstream tmp_msh(trib_marsh.value);
-		  //		  read_json(tmp_msh, trib);
-		  //		  tmptrib_class.contents = trib.get<string>("tribble");
-		  //		  printf("tmptrib contents %s\n", (tmptrib_class.contents).c_str());
-		  //		  tmptrib_class.userid = trib.get<string>("user_id");
-		  //  tmptrib_class.posted =  ;// trib.get<int64_t>("time_stamp");
 		  tmptrib_class.contents = 
 		      (( friends_arrays[min_int]).at(subs_index[min_int])).contents;
 		  // trib.get<string>("tribble");
 		  //     printf("tmptrib contents %s\n", (tmptrib_class.contents).c_str());
 		  tmptrib_class.userid =( (friends_arrays[min_int]).at(subs_index[min_int])).userid ;
+		  int backend_num = (( (friends_arrays[min_int]).at(subs_index[min_int])).posted).size() ;
 		  // trib.get<string>("user_id");
-//		  tmptrib_class.posted =( (friends_arrays[min_int]).at(subs_index[min_int])).posted  ;
+		  //		  tmptrib_class.posted =( (friends_arrays[min_int]).at(subs_index[min_int])).posted  ;
 		  // trib.get<int64_t>("time_stamp");
+		  (tmptrib_class.posted).resize( backend_num, 0);
+		  // vector<int64_t>::iterator it_posted = (tmptrib_class.posted).begin(); 
+		  for(int bi = 1 ;  bi <= backend_num ; bi++ ) {
+		      (tmptrib_class.posted)[bi-1] =
+			  (( (friends_arrays[min_int]).at(subs_index[min_int])).posted)[bi-1] ;
+			  // ( boost::lexical_cast<int64_t> ( trib.get<string> ("vec_timestamp:"+boost::lexical_cast<string>(bi) ))) ;
+#ifdef DEBUG_TS
+		      cout<< tmptrib_class.userid  <<" time vector : "<<bi<<" = "<<tmptrib_class.posted[bi-1]<<endl;
+#endif
+		      // it_posted++; 
+		  }
+
 		  subs_current_trib[min_int] = tmptrib_class;
+/*
+#ifdef DEBUG_TS
+	      Tribble  tmpst =  subs_current_trib[min_int];
+	      for(int bi = 1 ;  bi <= backend_num ; bi++ ) {
+		  cout<< tmpst.userid  <<" time vector : "<<bi<<" = "<<((tmpst).posted)[bi-1]<<endl;
+	      }
+#endif
+*/
 	      }
 	  }
 	  else {
@@ -761,25 +774,7 @@ class TribblerHandler : virtual public TribblerIf {
 	  }
       }
       _return.status = TribbleStatus::OK;
-      //      sort( (_return.tribbles).begin(), (_return.tribbles).end(), compareTribbleFunc);
-/*
-      string user_get_friends = userid + ":friends_tweets" ;	
-      printf("fetch %s\n", user_get_friends.c_str());
-      KeyValueStore::GetListResponse res = GetList(user_get_friends);
-      vector<string> get_t_list = res.values;
-      printf("Getlist Response Status: %d ; Tribble size : %d \n",res.status, (int)get_t_list.size());
-      //    vector<Tribble> t_list ;
-      Tribbler::Tribble t_list_node;
-      for(vector<string>::iterator it = get_t_list.begin(); it != get_t_list.end(); ++it)
-      {
-	  t_list_node.contents = *it ;// it;
-	  (_return.tribbles).push_back(t_list_node);
-      }
-      //     _return.tribbles = t_list;
-      // _return.status = TribbleStatus::NOT_IMPLEMENTED;
-
-      //    _return.status = TribbleStatus::NOT_IMPLEMENTED;
-      */
+     
 #ifdef DEBUG_TS
       cout<<"At the end of GetTribblesBySubscription"<<endl;
 #endif

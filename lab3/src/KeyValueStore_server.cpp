@@ -13,6 +13,9 @@
 
 #include <boost/lexical_cast.hpp>
 
+#include <boost/property_tree/ptree.hpp>
+#include <boost/property_tree/json_parser.hpp>
+
 using namespace ::apache::thrift;
 using namespace ::apache::thrift::protocol;
 using namespace ::apache::thrift::transport;
@@ -25,6 +28,11 @@ using namespace  ::KeyValueStore;
 using boost::unordered_map;
 
 using boost::lexical_cast;
+// json
+using boost::property_tree::ptree; 
+using boost::property_tree::read_json; 
+using boost::property_tree::write_json;
+//
 
 typedef boost::unordered_map<std::string, std::string > KVMap;
 typedef boost::unordered_map<std::string, std::vector<string> > KVMapList;
@@ -87,32 +95,11 @@ class KeyValueStoreHandler : virtual public KeyValueStoreIf {
 		    
 		}
 	    }
-	    /*
-	    // if the users are larger than 0 , scan the subscription list  
-
-	    // KeyValueStore::GetResponse validate_id =
-	    kv_client.Get(res, userid);
-	    KVPut( user_id , validate_id.value );
-
-	    string subs = user_id + ":subscriptions";
-	    kv_client.GetList( res , subs );
-	    for( vector<string>::const_iterator subs_it = (res.values).begin();
-	    subs_it != (res.values).end() ; subs_it++ ){
-	    KVAddToList( subs, subs_it  ); 
-	    }
-
-
-    */
 	    transport->close();
-
 
 	} catch(TTransportException e){
 
 	}
-
-
-	//	index++;
-
 	
     }
 
@@ -120,10 +107,10 @@ class KeyValueStoreHandler : virtual public KeyValueStoreIf {
 #ifdef DEBUG_KV 
     cout<<"The number of KV StoreHandler = "<<_backendServerVector.size()<<endl; 
 #endif
-    vec_timestamp.resize(_backendServerVector.size(), boost::lexical_cast<string>(0) );
+    vec_timestamp.resize(2+_backendServerVector.size(), boost::lexical_cast<string>(0) );
 
 #ifdef DEBUG_KV 
-    for(size_t i = 0; i<  _backendServerVector.size(); i++){
+    for(size_t i = 1; i<=  1+_backendServerVector.size(); i++){
 	cout<<"The "<<i<<" slot: "<<vec_timestamp[i]<<endl; 
     }
 #endif
@@ -202,9 +189,58 @@ class KeyValueStoreHandler : virtual public KeyValueStoreIf {
       }
       else
       {
-	  kv_store.insert( KVMap::value_type(key,value) );
+#ifdef DEBUG_KV 
+	  cout<<"[KV][Put] put the key-and-value: "<<key<<" : "<<value<<endl; 
+#endif
+	  // insert time stamp 
+	  bool trib_or_not = false;
+	  //	  if(!(trib.get<string>("user_id")).empty()){
+	  if(value.at(0) == '{'){
+	      trib_or_not = true;	      
+	  }
 
+	  
 #ifdef DEBUG_KV
+	  // cout<<"Is this a tribbler Put:  "<<(trib.get<string>("user_id"))<<endl;
+	  cout<<"Test it whether is trib: "<<trib_or_not<<endl;
+	  cout<<value.at(0)<<endl;//<<" :" <<value.at(1)<<endl;
+#endif
+
+
+	  string mash_t;//  = mash_trib.str();
+
+	  if(trib_or_not){
+	      ptree tp ; 
+	      ptree trib ;
+	      stringstream tribss(value);
+	      read_json(tribss,trib);
+
+	      tp.put("user_id", trib.get<string>("user_id"));
+	      tp.put("tribble",trib.get<string>("tribble"))	;
+	      tp.put("time_stamp", trib.get<string>("time_stamp") );
+	      tp.put("backend_num", boost::lexical_cast<int>( 1 + _backendServerVector.size()) );
+
+	      for( size_t i = 1 ; i <= 1 + _backendServerVector.size(); i++ ){
+		  tp.put("vec_timestamp:"+boost::lexical_cast<string>(i), vec_timestamp[i] );
+	      }
+	      stringstream mash_trib;
+	      write_json(mash_trib, tp);
+	      // tp.put("vec_timestamp", vec_timestamp);
+	      mash_t  = mash_trib.str();
+	      kv_store.insert( KVMap::value_type(key,mash_t) );
+#ifdef DEBUG_KV 
+	  cout<<"Re-[KV][Put] put the key-and-value: "<<key<<" : "<<mash_t<<endl; 
+#endif
+	  }
+	  //	  kv_store.insert( KVMap::value_type(key,value) );
+	  // not tribble value 
+	  else{
+	      kv_store.insert( KVMap::value_type(key,value) );
+	  }
+
+	  // insert time stamp 
+#ifdef DEBUG_KV
+	  /*
 	  cout<<"+++++++++++++++++"<<endl;
 	  cout<<"Tribble request put and succeed"<<endl;//<< kv_store.at(key)<<endl;
 	  for( KVMap::const_iterator it = kv_store.begin(); it != kv_store.end(); it++){
@@ -212,6 +248,7 @@ class KeyValueStoreHandler : virtual public KeyValueStoreIf {
 	  }
 	  cout<<"+++++++++++++++++"<<endl;
 	  cout<<"Backend server number = "<< _backendServerVector.size()<<endl;
+	  */
 #endif
 
 	  for( vector< pair<string, int> >::iterator it = _backendServerVector.begin() ;
@@ -244,7 +281,16 @@ class KeyValueStoreHandler : virtual public KeyValueStoreIf {
 		  transport->open();
 		  //if(transport->isOpen()){
 		  // try{
-		  kv_client.KVPut(key,value, clientid);
+
+		  string cid = boost::lexical_cast<string> (_id);
+
+		  if(trib_or_not){
+		      kv_client.KVPut(key, mash_t, cid);
+		  }
+		  else 
+		  {
+		      kv_client.KVPut(key,value, cid);
+		  }
 		  //}//catch( ){; }
 		  // }
 		  transport->close();
@@ -315,7 +361,8 @@ class KeyValueStoreHandler : virtual public KeyValueStoreIf {
 		  boost::shared_ptr<TProtocol> protocol(new TBinaryProtocol(transport));
 		  KeyValueStoreClient kv_client(protocol);
 		  transport->open();
-		  kv_client.KVAddToList(key,value, clientid);
+		  string cid = boost::lexical_cast<string> (_id);
+		  kv_client.KVAddToList(key, value, cid);
 		  transport->close();
 	      } catch( TTransportException e){
 	      }
@@ -451,8 +498,11 @@ class KeyValueStoreHandler : virtual public KeyValueStoreIf {
   }
 
 void KVPut(const std::string& key, const std::string& value, const std::string& clientid){
-    printf("KVPut");
+    printf("KVPut\n");
     // if the timestamp vector all larger than my local timestamp, then do it 
+    int cid = _id;// boost::lexical_cast<int> (clientid);
+    vec_timestamp[ cid ] = boost::lexical_cast<string>( boost::lexical_cast<int64_t> (vec_timestamp[cid])+1);
+
     bool found = (kv_store.find(key)!=kv_store.end());
     //  kv_store.insert(key,value);	
     if(found){
@@ -465,7 +515,77 @@ void KVPut(const std::string& key, const std::string& value, const std::string& 
     }
     else
     {
-	kv_store.insert( KVMap::value_type(key,value) );
+
+	bool trib_or_not = false;
+	  //	  if(!(trib.get<string>("user_id")).empty()){
+	  if(value.at(0) == '{'){
+	      trib_or_not = true;	      
+	  }
+	  string mash_t;//  = mash_trib.str();
+	  int proc_id = boost::lexical_cast<int> (clientid) ;
+#ifdef DEBUG_KV
+	  cout<<"Test it whether is trib: "<<trib_or_not<<endl;
+	  cout<<value.at(0)<<endl;//<<" :" <<value.at(1)<<endl;
+	  cout<<"Rec from #proc: "<<proc_id<<endl;
+#endif
+	  if(trib_or_not){
+
+	      int64_t local_time, other_time ;
+
+#ifdef DEBUG_KV 
+	      cout<<"Rec from #proc: "<<proc_id<<endl;
+#endif
+
+	      ptree tp ; 
+	      ptree trib ;
+	      stringstream tribss(value);
+	      read_json(tribss,trib);
+
+	      tp.put("user_id", trib.get<string>("user_id"));
+	      tp.put("tribble",trib.get<string>("tribble"))	;
+	      tp.put("time_stamp", trib.get<string>("time_stamp") );
+	      tp.put("backend_num", boost::lexical_cast<int>( 1 + _backendServerVector.size()) );
+
+	      string vci = "vec_timestamp:"+clientid;
+	      other_time = boost::lexical_cast<int64_t> (trib.get<string>(vci));
+
+	      vec_timestamp[proc_id] = boost::lexical_cast<string> (other_time);
+
+#ifdef DEBUG_KV 
+	  cout<<"[KV][Put] put the key-and-value: "<<key<<" : "<<value<<endl; 
+	  cout<<"Rec from #proc: "<<proc_id<<endl;
+	  cout<<"Time: "<<other_time<<endl;
+	  
+#endif
+	
+
+		  
+	      for( size_t i = 1 ; i <= 1 + _backendServerVector.size(); i++ ){
+		  vci = "vec_timestamp:"+boost::lexical_cast<string>(i);
+		  other_time = boost::lexical_cast<int64_t> (trib.get<string>(vci));
+		  local_time = boost::lexical_cast<int64_t> (vec_timestamp[i]);
+		  local_time = (other_time > local_time ) ? other_time : local_time;
+		  vec_timestamp[i] = boost::lexical_cast<string> (local_time);
+		  tp.put( vci  , vec_timestamp[i]  );
+	      }
+	      stringstream mash_trib;
+	      write_json(mash_trib, tp);
+	      // tp.put("vec_timestamp", vec_timestamp);
+	      mash_t  = mash_trib.str();
+	      kv_store.insert( KVMap::value_type(key,mash_t) );
+#ifdef DEBUG_KV 
+	  cout<<"Re-[KV][Put] put the key-and-value: "<<key<<" : "<<mash_t<<endl; 
+#endif
+	  }
+	  //	  kv_store.insert( KVMap::value_type(key,value) );
+	  // not tribble value 
+	  else{
+	      kv_store.insert( KVMap::value_type(key,value) );
+	  }
+
+
+
+// 	kv_store.insert( KVMap::value_type(key,value) );
 
 #ifdef DEBUG_KV
 	cout<<"+++++++++++++++++"<<endl;
