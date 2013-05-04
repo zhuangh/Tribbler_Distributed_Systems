@@ -20,9 +20,6 @@ class KeyValueStoreIf {
   virtual KVStoreStatus::type Put(const std::string& key, const std::string& value, const std::string& clientid) = 0;
   virtual KVStoreStatus::type AddToList(const std::string& key, const std::string& value, const std::string& clientid) = 0;
   virtual KVStoreStatus::type RemoveFromList(const std::string& key, const std::string& value, const std::string& clientid) = 0;
-  virtual void KVPut(const std::string& key, const std::string& value, const std::string& clientid) = 0;
-  virtual void KVAddToList(const std::string& key, const std::string& value, const std::string& clientid) = 0;
-  virtual void KVRemoveFromList(const std::string& key, const std::string& value, const std::string& clientid) = 0;
 };
 
 class KeyValueStoreIfFactory {
@@ -69,15 +66,6 @@ class KeyValueStoreNull : virtual public KeyValueStoreIf {
   KVStoreStatus::type RemoveFromList(const std::string& /* key */, const std::string& /* value */, const std::string& /* clientid */) {
     KVStoreStatus::type _return = (KVStoreStatus::type)0;
     return _return;
-  }
-  void KVPut(const std::string& /* key */, const std::string& /* value */, const std::string& /* clientid */) {
-    return;
-  }
-  void KVAddToList(const std::string& /* key */, const std::string& /* value */, const std::string& /* clientid */) {
-    return;
-  }
-  void KVRemoveFromList(const std::string& /* key */, const std::string& /* value */, const std::string& /* clientid */) {
-    return;
   }
 };
 
@@ -675,213 +663,6 @@ class KeyValueStore_RemoveFromList_presult {
 
 };
 
-typedef struct _KeyValueStore_KVPut_args__isset {
-  _KeyValueStore_KVPut_args__isset() : key(false), value(false), clientid(false) {}
-  bool key;
-  bool value;
-  bool clientid;
-} _KeyValueStore_KVPut_args__isset;
-
-class KeyValueStore_KVPut_args {
- public:
-
-  KeyValueStore_KVPut_args() : key(), value(), clientid() {
-  }
-
-  virtual ~KeyValueStore_KVPut_args() throw() {}
-
-  std::string key;
-  std::string value;
-  std::string clientid;
-
-  _KeyValueStore_KVPut_args__isset __isset;
-
-  void __set_key(const std::string& val) {
-    key = val;
-  }
-
-  void __set_value(const std::string& val) {
-    value = val;
-  }
-
-  void __set_clientid(const std::string& val) {
-    clientid = val;
-  }
-
-  bool operator == (const KeyValueStore_KVPut_args & rhs) const
-  {
-    if (!(key == rhs.key))
-      return false;
-    if (!(value == rhs.value))
-      return false;
-    if (!(clientid == rhs.clientid))
-      return false;
-    return true;
-  }
-  bool operator != (const KeyValueStore_KVPut_args &rhs) const {
-    return !(*this == rhs);
-  }
-
-  bool operator < (const KeyValueStore_KVPut_args & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
-};
-
-
-class KeyValueStore_KVPut_pargs {
- public:
-
-
-  virtual ~KeyValueStore_KVPut_pargs() throw() {}
-
-  const std::string* key;
-  const std::string* value;
-  const std::string* clientid;
-
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
-};
-
-typedef struct _KeyValueStore_KVAddToList_args__isset {
-  _KeyValueStore_KVAddToList_args__isset() : key(false), value(false), clientid(false) {}
-  bool key;
-  bool value;
-  bool clientid;
-} _KeyValueStore_KVAddToList_args__isset;
-
-class KeyValueStore_KVAddToList_args {
- public:
-
-  KeyValueStore_KVAddToList_args() : key(), value(), clientid() {
-  }
-
-  virtual ~KeyValueStore_KVAddToList_args() throw() {}
-
-  std::string key;
-  std::string value;
-  std::string clientid;
-
-  _KeyValueStore_KVAddToList_args__isset __isset;
-
-  void __set_key(const std::string& val) {
-    key = val;
-  }
-
-  void __set_value(const std::string& val) {
-    value = val;
-  }
-
-  void __set_clientid(const std::string& val) {
-    clientid = val;
-  }
-
-  bool operator == (const KeyValueStore_KVAddToList_args & rhs) const
-  {
-    if (!(key == rhs.key))
-      return false;
-    if (!(value == rhs.value))
-      return false;
-    if (!(clientid == rhs.clientid))
-      return false;
-    return true;
-  }
-  bool operator != (const KeyValueStore_KVAddToList_args &rhs) const {
-    return !(*this == rhs);
-  }
-
-  bool operator < (const KeyValueStore_KVAddToList_args & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
-};
-
-
-class KeyValueStore_KVAddToList_pargs {
- public:
-
-
-  virtual ~KeyValueStore_KVAddToList_pargs() throw() {}
-
-  const std::string* key;
-  const std::string* value;
-  const std::string* clientid;
-
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
-};
-
-typedef struct _KeyValueStore_KVRemoveFromList_args__isset {
-  _KeyValueStore_KVRemoveFromList_args__isset() : key(false), value(false), clientid(false) {}
-  bool key;
-  bool value;
-  bool clientid;
-} _KeyValueStore_KVRemoveFromList_args__isset;
-
-class KeyValueStore_KVRemoveFromList_args {
- public:
-
-  KeyValueStore_KVRemoveFromList_args() : key(), value(), clientid() {
-  }
-
-  virtual ~KeyValueStore_KVRemoveFromList_args() throw() {}
-
-  std::string key;
-  std::string value;
-  std::string clientid;
-
-  _KeyValueStore_KVRemoveFromList_args__isset __isset;
-
-  void __set_key(const std::string& val) {
-    key = val;
-  }
-
-  void __set_value(const std::string& val) {
-    value = val;
-  }
-
-  void __set_clientid(const std::string& val) {
-    clientid = val;
-  }
-
-  bool operator == (const KeyValueStore_KVRemoveFromList_args & rhs) const
-  {
-    if (!(key == rhs.key))
-      return false;
-    if (!(value == rhs.value))
-      return false;
-    if (!(clientid == rhs.clientid))
-      return false;
-    return true;
-  }
-  bool operator != (const KeyValueStore_KVRemoveFromList_args &rhs) const {
-    return !(*this == rhs);
-  }
-
-  bool operator < (const KeyValueStore_KVRemoveFromList_args & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
-};
-
-
-class KeyValueStore_KVRemoveFromList_pargs {
- public:
-
-
-  virtual ~KeyValueStore_KVRemoveFromList_pargs() throw() {}
-
-  const std::string* key;
-  const std::string* value;
-  const std::string* clientid;
-
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
-
-};
-
 class KeyValueStoreClient : virtual public KeyValueStoreIf {
  public:
   KeyValueStoreClient(boost::shared_ptr< ::apache::thrift::protocol::TProtocol> prot) :
@@ -917,12 +698,6 @@ class KeyValueStoreClient : virtual public KeyValueStoreIf {
   KVStoreStatus::type RemoveFromList(const std::string& key, const std::string& value, const std::string& clientid);
   void send_RemoveFromList(const std::string& key, const std::string& value, const std::string& clientid);
   KVStoreStatus::type recv_RemoveFromList();
-  void KVPut(const std::string& key, const std::string& value, const std::string& clientid);
-  void send_KVPut(const std::string& key, const std::string& value, const std::string& clientid);
-  void KVAddToList(const std::string& key, const std::string& value, const std::string& clientid);
-  void send_KVAddToList(const std::string& key, const std::string& value, const std::string& clientid);
-  void KVRemoveFromList(const std::string& key, const std::string& value, const std::string& clientid);
-  void send_KVRemoveFromList(const std::string& key, const std::string& value, const std::string& clientid);
  protected:
   boost::shared_ptr< ::apache::thrift::protocol::TProtocol> piprot_;
   boost::shared_ptr< ::apache::thrift::protocol::TProtocol> poprot_;
@@ -943,9 +718,6 @@ class KeyValueStoreProcessor : public ::apache::thrift::TDispatchProcessor {
   void process_Put(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
   void process_AddToList(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
   void process_RemoveFromList(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
-  void process_KVPut(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
-  void process_KVAddToList(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
-  void process_KVRemoveFromList(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
  public:
   KeyValueStoreProcessor(boost::shared_ptr<KeyValueStoreIf> iface) :
     iface_(iface) {
@@ -954,9 +726,6 @@ class KeyValueStoreProcessor : public ::apache::thrift::TDispatchProcessor {
     processMap_["Put"] = &KeyValueStoreProcessor::process_Put;
     processMap_["AddToList"] = &KeyValueStoreProcessor::process_AddToList;
     processMap_["RemoveFromList"] = &KeyValueStoreProcessor::process_RemoveFromList;
-    processMap_["KVPut"] = &KeyValueStoreProcessor::process_KVPut;
-    processMap_["KVAddToList"] = &KeyValueStoreProcessor::process_KVAddToList;
-    processMap_["KVRemoveFromList"] = &KeyValueStoreProcessor::process_KVRemoveFromList;
   }
 
   virtual ~KeyValueStoreProcessor() {}
@@ -1030,33 +799,6 @@ class KeyValueStoreMultiface : virtual public KeyValueStoreIf {
       ifaces_[i]->RemoveFromList(key, value, clientid);
     }
     return ifaces_[i]->RemoveFromList(key, value, clientid);
-  }
-
-  void KVPut(const std::string& key, const std::string& value, const std::string& clientid) {
-    size_t sz = ifaces_.size();
-    size_t i = 0;
-    for (; i < (sz - 1); ++i) {
-      ifaces_[i]->KVPut(key, value, clientid);
-    }
-    ifaces_[i]->KVPut(key, value, clientid);
-  }
-
-  void KVAddToList(const std::string& key, const std::string& value, const std::string& clientid) {
-    size_t sz = ifaces_.size();
-    size_t i = 0;
-    for (; i < (sz - 1); ++i) {
-      ifaces_[i]->KVAddToList(key, value, clientid);
-    }
-    ifaces_[i]->KVAddToList(key, value, clientid);
-  }
-
-  void KVRemoveFromList(const std::string& key, const std::string& value, const std::string& clientid) {
-    size_t sz = ifaces_.size();
-    size_t i = 0;
-    for (; i < (sz - 1); ++i) {
-      ifaces_[i]->KVRemoveFromList(key, value, clientid);
-    }
-    ifaces_[i]->KVRemoveFromList(key, value, clientid);
   }
 
 };

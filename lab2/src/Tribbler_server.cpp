@@ -137,8 +137,17 @@ public:
 
     string userid_subs = userid+":subscriptions";
     KeyValueStore::GetListResponse subs = GetList(userid_subs);
-    if(subs.status == KVStoreStatus::EKEYNOTFOUND){
-	return TribbleStatus::INVALID_SUBSCRIBETO;
+
+    if( ( (subs.values).size()>0 ) &&
+	subs.status != KVStoreStatus::EKEYNOTFOUND){
+	for( vector<string>::iterator it = (subs.values).begin(); 
+	     it !=(subs.values).end(); it++ )
+	{
+             if( *it == subscribeto){
+		 return TribbleStatus::EEXISTS;
+	     }	    
+	}
+//	return TribbleStatus::INVALID_SUBSCRIBETO;
     }
 
     /*
@@ -879,6 +888,9 @@ public:
     // Making the RPC Call
     KVStoreStatus::type st;
     transport->open();
+#ifdef DEBUG_KV
+    printf("Addtolist in the RPC\n");
+#endif
     st = kv_client.AddToList(key, value);
     transport->close();
     return st;

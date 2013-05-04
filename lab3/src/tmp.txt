@@ -1,0 +1,28 @@
+	  for( vector< pair<string, int> >::iterator it = _backendServerVector.begin() ;
+	       it!= _backendServerVector.end() ; it++ )
+	  {
+	      string _bs = it->first;
+	      int _bs_port =  (it->second);
+#ifdef DEBUG_KV
+	      cout<<"The backend address: "<< _bs<<endl;
+	      cout<<"The port in backend address: "<< _bs_port<<endl;
+#endif
+	      boost::shared_ptr<TSocket> socket(new TSocket(_bs, _bs_port));
+	      socket->setSendTimeout(TIMEOUT_IN_MS);
+	      socket->setConnTimeout(TIMEOUT_IN_MS);
+	      boost::shared_ptr<TTransport> transport(new TBufferedTransport(socket));
+	      try{
+		  boost::shared_ptr<TProtocol> protocol(new TBinaryProtocol(transport));
+		  KeyValueStoreClient kv_client(protocol);
+		  transport->open();
+		  kv_client.KVPut(key,value, clientid);
+		  transport->close();
+	      } catch( TTransportException e){
+	      }
+
+#ifdef DEBUG_KV
+	      cout<<"[KV}[AddToList] Finish the KVPut to list in RPC"<<endl;
+#endif
+	  }
+
+

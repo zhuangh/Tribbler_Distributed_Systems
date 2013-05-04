@@ -6,23 +6,31 @@
 #include <thrift/server/TSimpleServer.h>
 #include <thrift/transport/TServerSocket.h>
 #include <thrift/transport/TBufferTransports.h>
+
+#include <transport/TSocket.h>
+
 #include <boost/unordered_map.hpp>
+
+#include <boost/lexical_cast.hpp>
 
 using namespace ::apache::thrift;
 using namespace ::apache::thrift::protocol;
 using namespace ::apache::thrift::transport;
 using namespace ::apache::thrift::server;
 
+
 using boost::shared_ptr;
 using namespace std;
 using namespace  ::KeyValueStore;
 using boost::unordered_map;
 
+using boost::lexical_cast;
 
 typedef boost::unordered_map<std::string, std::string > KVMap;
 typedef boost::unordered_map<std::string, std::vector<string> > KVMapList;
 
 #define DEBUG_KV
+static int TIMEOUT_IN_MS = 100;
 
 class KeyValueStoreHandler : virtual public KeyValueStoreIf {
  public:
@@ -30,19 +38,95 @@ class KeyValueStoreHandler : virtual public KeyValueStoreIf {
     // Your initialization goes here
     _id = atoi(argv[1]);
     int index = 0;
-#ifdef DEBUG_KV 
-    printf("The number of KV StoreHandler %d\n", argc); 
-#endif
+    
+
 
     for(int i = 3; i+1 < argc; i += 2) {
-      if (index == _id) {
-        _backendServerVector.push_back(make_pair("localhost", atoi(argv[2])));
-      }
-      string peer_ip(argv[i]);
-      int peer_port = atoi(argv[i+1]);
-      _backendServerVector.push_back(make_pair(peer_ip, peer_port));
-      cout << "Backend server at: " << peer_ip << " on port: " << peer_port << endl;
+	if (index == _id) {
+	    _backendServerVector.push_back(make_pair("localhost", atoi(argv[2])));
+	}
+	string peer_ip(argv[i]);
+	int peer_port = atoi(argv[i+1]);
+	_backendServerVector.push_back(make_pair(peer_ip, peer_port));
+	//    size_t sz = _backendServerVector.size();
+
+	cout << "Backend server at: " << peer_ip << " on port: " << peer_port << endl;
+
+
+
+	try{
+	    boost::shared_ptr<TSocket> socket( new TSocket(peer_ip, peer_port) );
+
+
+	    boost::shared_ptr<TTransport> transport( new TBufferedTransport(socket));
+	    boost::shared_ptr<TProtocol> protocol(new TBinaryProtocol(transport));
+	    KeyValueStoreClient kv_client(protocol);
+	    //	  KVStoreStatus::type st ; 
+	    transport->open();
+
+	    cout << "[KV Init][Connect] Backend server at: " << peer_ip << " on port: " << peer_port << endl;
+
+	    KeyValueStore::GetResponse res ;
+	    KeyValueStore::GetListResponse res_list ;
+	    string key = "user_list";
+	    kv_client.GetList( res_list , key);
+	    vector<string> ul = res_list.values;
+	    if(ul.size()>0){
+		for(vector<string>::const_iterator it = ul.begin();
+		    it != ul.end();
+		    it++){
+		    // get user list and register
+		    // kv_client.Get(res, (*it));
+		    // kv_store.insert(KVMap::value_type((*it),res.value));
+		    kv_store.insert(KVMap::value_type((*it), boost::lexical_cast<string>(0)));
+		    // initial the tribbler memo
+		    kv_store.insert(KVMap::value_type((*it)+":trib_index"+":"+ boost::lexical_cast<string>(0) ,res.value));
+		    // get the subscription list 
+		    kv_client.GetList(res_list, (*it)+":subscriptions");
+		    kv_list.insert(KVMapList::value_type( (*it) +":subscriptions", res_list.values ));
+		    
+		}
+	    }
+	    /*
+	    // if the users are larger than 0 , scan the subscription list  
+
+	    // KeyValueStore::GetResponse validate_id =
+	    kv_client.Get(res, userid);
+	    KVPut( user_id , validate_id.value );
+
+	    string subs = user_id + ":subscriptions";
+	    kv_client.GetList( res , subs );
+	    for( vector<string>::const_iterator subs_it = (res.values).begin();
+	    subs_it != (res.values).end() ; subs_it++ ){
+	    KVAddToList( subs, subs_it  ); 
+	    }
+
+
+    */
+	    transport->close();
+
+
+	} catch(TTransportException e){
+
+	}
+
+
+	//	index++;
+
+	
     }
+
+
+#ifdef DEBUG_KV 
+    cout<<"The number of KV StoreHandler = "<<_backendServerVector.size()<<endl; 
+#endif
+    vec_timestamp.resize(_backendServerVector.size(), boost::lexical_cast<string>(0) );
+
+#ifdef DEBUG_KV 
+    for(size_t i = 0; i<  _backendServerVector.size(); i++){
+	cout<<"The "<<i<<" slot: "<<vec_timestamp[i]<<endl; 
+    }
+#endif
   }
 
   void Get(GetResponse& _return, const std::string& key) {
@@ -50,63 +134,243 @@ class KeyValueStoreHandler : virtual public KeyValueStoreIf {
     printf("Get\n");
 #ifdef DEBUG_KV
     printf("KV get %s\n", key.c_str() );
+    cout<<"Found(1), Not(0): "<<( kv_store.find(key) != kv_store.end())<<endl;
 #endif
-    
-    if(kv_store.find(key) != kv_store.end())
+
+    if(kv_store.find(key) == kv_store.end())
      	_return.status = KVStoreStatus::EKEYNOTFOUND;
-    else 
+    else{ 
+	_return.value  = kv_store.at(key);
 	_return.status = KVStoreStatus::EITEMEXISTS; // duplicate in lists
+    }
   }
 
   void GetList(GetListResponse& _return, const std::string& key) {
     // Your implementation goes here
-    printf("GetList\n");
+      printf("GetList\n");
+      bool found = ( kv_list.find(key) != kv_list.end()); 
 
-    _return.status =  KVStoreStatus::NOT_IMPLEMENTED;
+#ifdef DEBUG_KV
+      cout<<"Find the key : "<<key<<" | Found(1), not found(0): "<<found <<endl;
+#endif
+
+
+      if(found)
+      {
+	  // vector<string> values_list = kv_list.at(key);
+	  // values_list.push_back(value);
+#ifdef DEBUG_KV
+	  // string t_value = "after push "+value;
+	  // vector<string> values_list_test = kv_list.at(key);
+	  // vector<string>::iterator it = (values_list.end()-1);
+	  // cout<<"test after push and modified the value, that should not change the list item: "<<(*it)<<endl;
+#endif
+	  _return.status = KVStoreStatus::EITEMEXISTS;
+	  vector<string> it_list = kv_list.at(key);
+	  for( vector<string>::const_iterator it = it_list.begin() ; it != it_list.end(); it++){  
+	      (_return.values).push_back(*it);
+	  }
+#ifdef DEBUG_KV
+	  cout<<"[KV][Getlist]The return values size: "<<(_return.values).size()<<endl;
+	  // string t_value = "after push "+value;
+	  // vector<string> values_list_test = kv_list.at(key);
+	  // vector<string>::iterator it = (values_list.end()-1);
+	  // cout<<"test after push and modified the value, that should not change the list item: "<<(*it)<<endl;
+#endif  
+	  return ;//KVStoreStatus::EITEMEXISTS;
+      }
+      else{ 
+	  _return.status = KVStoreStatus::EKEYNOTFOUND;
+	  return ;
+      }
+//     _return.status =  KVStoreStatus::NOT_IMPLEMENTED;
   }
 
   KVStoreStatus::type Put(const std::string& key, const std::string& value, const std::string& clientid) {
-    // Your implementation goes here
-    printf("Put\n");
-    bool found = (kv_store.find(key)!=kv_store.end());
-    kv_store.insert(key,value);	
-    if(found){
-        string & tmp = kv_store.at(key);	
-	tmp = value; 
+      // Your implementation goes here
+      printf("Put\n");
+      bool found = (kv_store.find(key)!=kv_store.end());
+      vec_timestamp[_id] = boost::lexical_cast<string>( boost::lexical_cast<int64_t> (vec_timestamp[_id])+1);
+      //  kv_store.insert(key,value);	
+      if(found){
+	  //        string & tmp = kv_store.at(key);	
+	  //	tmp = value; 
 #ifdef DEBUG_KV
-	cout<<"after change: "<< kv_store.at(key)<<endl;
+	  cout<<"Should never exisits this sentence: !! after change: "<< kv_store.at(key)<<endl;
 #endif
-	return KVStoreStatus::EITEMEXISTS;
-    }
-    else
-    {
-	kv_store.insert(key,value);
-	return KVStoreStatus::EKEYNOTFOUND;
-    }
-    return KVStoreStatus::EPUTFAILED;
+	  return KVStoreStatus::EITEMEXISTS;
+      }
+      else
+      {
+	  kv_store.insert( KVMap::value_type(key,value) );
+
+#ifdef DEBUG_KV
+	  cout<<"+++++++++++++++++"<<endl;
+	  cout<<"Tribble request put and succeed"<<endl;//<< kv_store.at(key)<<endl;
+	  for( KVMap::const_iterator it = kv_store.begin(); it != kv_store.end(); it++){
+	      cout<< it->first<<" : " <<it->second<<endl;
+	  }
+	  cout<<"+++++++++++++++++"<<endl;
+	  cout<<"Backend server number = "<< _backendServerVector.size()<<endl;
+#endif
+
+	  for( vector< pair<string, int> >::iterator it = _backendServerVector.begin() ;
+	       it!= _backendServerVector.end() ; it++ )
+	  {
+	      string _bs = it->first;
+	      int _bs_port =  (it->second);
+#ifdef DEBUG_KV
+	      cout<<"The backend address: "<< _bs<<endl;
+	      cout<<"The port in backend address: "<< _bs_port<<endl;
+#endif
+	      //	      string _bs_port = boost::lexical_cast<string> (it->second);
+
+
+	      boost::shared_ptr<TSocket> socket(new TSocket(_bs, _bs_port));
+	      socket->setSendTimeout(TIMEOUT_IN_MS);
+	      socket->setConnTimeout(TIMEOUT_IN_MS);
+	      boost::shared_ptr<TTransport> transport(new TBufferedTransport(socket));
+
+	      try{
+		  boost::shared_ptr<TProtocol> protocol(new TBinaryProtocol(transport));
+		  KeyValueStoreClient kv_client(protocol);
+
+
+#ifdef DEBUG_KV
+//		  cout<<"Peeking "<<transport->isOpen()<<" socket open? "<< socket->isOpen()<<endl;
+#endif
+		  //	      if(socket->isOpen()){
+
+		  transport->open();
+		  //if(transport->isOpen()){
+		  // try{
+		  kv_client.KVPut(key,value, clientid);
+		  //}//catch( ){; }
+		  // }
+		  transport->close();
+		  //	      }
+	      } catch( TTransportException e){
+		  //  e.printStackTrace();
+	      }
+
+#ifdef DEBUG_KV
+	      cout<<"[KV}[PUT] Finish the KVPut to list in RPC"<<endl;
+#endif
+	      //	      KVPut(key,value,clientid);
+	  }
+	  return KVStoreStatus::EITEMEXISTS;
+      }
+
+      return KVStoreStatus::EPUTFAILED;
   }
+
+
 
   KVStoreStatus::type AddToList(const std::string& key, const std::string& value, const std::string& clientid) {
       // Your implementation goes here
       printf("AddToList\n");
-
       bool found = ( kv_list.find(key) != kv_list.end()); 
       if(found)
       {
-	  vector<string> values_list = kv_list.at(key);
-	  values_list.push_back(value);
+
+	  // vector<string> values_list = kv_list.at(key);
+	  KVMapList::iterator values_list = kv_list.find(key);
+	  values_list->second.push_back(value);
 #ifdef DEBUG_KV
-	  string t_value = "after push "+value;
-	  vector<string> values_list_test = kv_list.at(key);
-	  vector<string>::iterator it = (values_list.end()-1);
-	  cout<<"test after push and modified the value, that should not change the list item: "<<(*it)<<endl;
+//	  cout<<values_list.size()<<endl;
+#endif 
+
+//	  values_list.push_back(value);
+
+#ifdef DEBUG_KV
+//	  cout<<values_list.size()<<endl;
 #endif
+//	  kv_list.insert(KVMapList::value_type(key,values_list));
+//	  ((kv_list.at(key))->second).push_back(value);
+#ifdef DEBUG_KV
+	  cout<<"+++++++++++++++++"<<endl;
+	  vector<string> values_list_test = kv_list.at(key);
+	  
+	  cout<<"Add to exist Key in List: "<<key<<"; The size is "<<values_list_test.size()<<endl;
+	  for( vector<string>::const_iterator it = values_list_test.begin(); it != values_list_test.end(); it++){
+	      cout<< (*it)<<endl;
+	  }
+	  cout<<"+++++++++++++++++"<<endl;
+#endif
+
+	  for( vector< pair<string, int> >::iterator it = _backendServerVector.begin() ;
+	       it!= _backendServerVector.end() ; it++ )
+	  {
+	      string _bs = it->first;
+	      int _bs_port =  (it->second);
+#ifdef DEBUG_KV
+	      cout<<"The backend address: "<< _bs<<endl;
+	      cout<<"The port in backend address: "<< _bs_port<<endl;
+#endif
+	      boost::shared_ptr<TSocket> socket(new TSocket(_bs, _bs_port));
+	      socket->setSendTimeout(TIMEOUT_IN_MS);
+	      socket->setConnTimeout(TIMEOUT_IN_MS);
+	      boost::shared_ptr<TTransport> transport(new TBufferedTransport(socket));
+	      try{
+		  boost::shared_ptr<TProtocol> protocol(new TBinaryProtocol(transport));
+		  KeyValueStoreClient kv_client(protocol);
+		  transport->open();
+		  kv_client.KVAddToList(key,value, clientid);
+		  transport->close();
+	      } catch( TTransportException e){
+	      }
+
+#ifdef DEBUG_KV
+	      cout<<"[KV}[AddToList] Finish the KVPut to list in RPC"<<endl;
+#endif
+	  }
+
 	  return KVStoreStatus::EITEMEXISTS;
       }
       else{ 
+	  // not found 
 	  vector<string> values;
 	  values.push_back(value);
-	  kv_list.insert(key,values);
+	  kv_list.insert(KVMapList::value_type(key,values) );
+#ifdef DEBUG_KV
+	  cout<<"+++++++++++++++++"<<endl;
+	  vector<string> values_list_test = kv_list.at(key);
+	  cout<<"Add to List with new Key: "<<key<<endl;
+	  for( vector<string>::const_iterator it = values_list_test.begin(); it != values_list_test.end(); it++){
+	      cout<< (*it)<<endl;
+	  }
+	
+	  cout<<"+++++++++++++++++"<<endl;
+#endif
+
+	  for( vector< pair<string, int> >::iterator it = _backendServerVector.begin() ;
+	       it!= _backendServerVector.end() ; it++ )
+	  {
+	      string _bs = it->first;
+	      int _bs_port =  (it->second);
+#ifdef DEBUG_KV
+	      cout<<"The backend address: "<< _bs<<endl;
+	      cout<<"The port in backend address: "<< _bs_port<<endl;
+#endif
+	      boost::shared_ptr<TSocket> socket(new TSocket(_bs, _bs_port));
+	      socket->setSendTimeout(TIMEOUT_IN_MS);
+	      socket->setConnTimeout(TIMEOUT_IN_MS);
+	      boost::shared_ptr<TTransport> transport(new TBufferedTransport(socket));
+	      try{
+		  boost::shared_ptr<TProtocol> protocol(new TBinaryProtocol(transport));
+		  KeyValueStoreClient kv_client(protocol);
+		  transport->open();
+		  kv_client.KVAddToList(key,value, clientid);
+		  transport->close();
+	      } catch( TTransportException e){
+	      }
+
+#ifdef DEBUG_KV
+	      cout<<"[KV}[AddToList] Finish the KVPut to list in RPC"<<endl;
+#endif
+	  }
+
+	  //KVAddToList(key,value,clientid);
 	  // not find the key insert the key and first elment
 	  return KVStoreStatus::EKEYNOTFOUND;
       }
@@ -114,41 +378,174 @@ class KeyValueStoreHandler : virtual public KeyValueStoreIf {
   }
 
   KVStoreStatus::type RemoveFromList(const std::string& key, const std::string& value, const std::string& clientid) {
-    // Your implementation goes here
-    printf("RemoveFromList\n");
-    bool found = ( kv_list.find(key) != kv_list.end()); 
-    // Key exist 
-    //    item exist
-    //    item doesnot exist
-    //
-    // Key dosnot exist 
+      // Your implementation goes here
+      printf("RemoveFromList\n");
+      bool found = ( kv_list.find(key) != kv_list.end()); 
 
-    // if(found){
-	// std::pair< string, vector<string> > key_values ; 
-	// key_values =  kv_list.equal_range(key);
-	vector<string > key_values =  kv_list.at(key);
-	for(vector<string>::iterator it = key_values.begin();
-	        it != key_values.end(); it++){
-	       // suppose not duplicated item  	
+      // Key exist 
+      //    item exist
+      //    item doesnot exist
+      //
+      // Key dosnot exist 
+
+      if(found){
+	  // std::pair< string, vector<string> > key_values ; 
+	  // key_values =  kv_list.equal_range(key);
+	  KVMapList::iterator values_list = kv_list.find(key);
+	  // values_list->second.push_back(value);
+
+//	  vector<string > key_values =  kv_list.at(key);
+	  vector<string>::iterator it = values_list->second.begin();
+	  for(	 ;       it != values_list->second.end();){
+	      if( *it == value ){
+#ifdef DEBUG_KV
+		  cout<<"[KV] !!!!!**********delete----> "<< *it<<endl;
+#endif
+		  values_list->second.erase(it);
+	      }
+	      else{
+		  it++;
+	      }
+	      // suppose not duplicated item  	
+#ifdef DEBUG_KV
+	      cout<< (*it)<<" ";
+#endif
+	  for( vector< pair<string, int> >::iterator it = _backendServerVector.begin() ;
+	       it!= _backendServerVector.end() ; it++ )
+	  {
+	      string _bs = it->first;
+	      int _bs_port =  (it->second);
+#ifdef DEBUG_KV
+	      cout<<"The backend address: "<< _bs<<endl;
+	      cout<<"The port in backend address: "<< _bs_port<<endl;
+#endif
+	      boost::shared_ptr<TSocket> socket(new TSocket(_bs, _bs_port));
+	      socket->setSendTimeout(TIMEOUT_IN_MS);
+	      socket->setConnTimeout(TIMEOUT_IN_MS);
+	      boost::shared_ptr<TTransport> transport(new TBufferedTransport(socket));
+	      try{
+		  boost::shared_ptr<TProtocol> protocol(new TBinaryProtocol(transport));
+		  KeyValueStoreClient kv_client(protocol);
+		  transport->open();
+		  kv_client.KVRemoveFromList(key,value, clientid);
+		  transport->close();
+	      } catch( TTransportException e){
+	      }
+
+#ifdef DEBUG_KV
+	      cout<<"[KV}[AddToList] Finish the KVPut to list in RPC"<<endl;
+#endif
+	  }
+
+	  }
+      }
+      else  {
+#ifdef DEBUG_KV
+	  cout<<"[KV] Not Found "<<endl;
+#endif
+	
+	  return KVStoreStatus::EITEMNOTFOUND;
+      }
+
+      return KVStoreStatus::OK;
+  }
+
+void KVPut(const std::string& key, const std::string& value, const std::string& clientid){
+    printf("KVPut");
+    // if the timestamp vector all larger than my local timestamp, then do it 
+    bool found = (kv_store.find(key)!=kv_store.end());
+    //  kv_store.insert(key,value);	
+    if(found){
+	//        string & tmp = kv_store.at(key);	
+	//	tmp = value; 
+#ifdef DEBUG_KV
+	cout<<"Should never exisits this sentence: !! after change: "
+	    << kv_store.at(key)<<endl;
+#endif
+    }
+    else
+    {
+	kv_store.insert( KVMap::value_type(key,value) );
+
+#ifdef DEBUG_KV
+	cout<<"+++++++++++++++++"<<endl;
+	cout<<"Tribble request put and succeed"<<endl;//<< kv_store.at(key)<<endl;
+	for( KVMap::const_iterator it = kv_store.begin(); it != kv_store.end(); it++){
+	    cout<< it->first<<" : " <<it->second<<endl;
+	}
+	cout<<"+++++++++++++++++"<<endl;
+	cout<<"Backend server number = "<< _backendServerVector.size()<<endl;
+#endif
+    }
+
+}
+
+  void KVAddToList(const std::string& key, const std::string& value, const std::string& clientid) {
+      printf("KVAddToList");
+      bool found = ( kv_list.find(key) != kv_list.end()); 
+      if(found)
+      {
+	  KVMapList::iterator values_list = kv_list.find(key);
+	  values_list->second.push_back(value);
+#ifdef DEBUG_KV
+	  cout<<"+++++++++++++++++"<<endl;
+	  vector<string> values_list_test = kv_list.at(key);
+	  
+	  cout<<"Add to exist Key in List: "<<key<<"; The size is "<<values_list_test.size()<<endl;
+	  for( vector<string>::const_iterator it = values_list_test.begin(); it != values_list_test.end(); it++){
+	      cout<< (*it)<<endl;
+	  }
+	  cout<<"+++++++++++++++++"<<endl;
+#endif
+      }
+      else{ 
+	  // not found 
+	  vector<string> values;
+	  values.push_back(value);
+	  kv_list.insert(KVMapList::value_type(key,values) );
+#ifdef DEBUG_KV
+	  cout<<"+++++++++++++++++"<<endl;
+	  vector<string> values_list_test = kv_list.at(key);
+	  cout<<"Add to List with new Key: "<<key<<endl;
+	  for( vector<string>::const_iterator it = values_list_test.begin(); it != values_list_test.end(); it++){
+	      cout<< (*it)<<endl;
+	  }
+	
+	  cout<<"+++++++++++++++++"<<endl;
+#endif
+	  // KVAddToList(key,value,clientid);
+      }
+  }
+
+void KVRemoveFromList(const std::string& key, const std::string& value, const std::string& clientid){
+    printf("KVRemoveFromList");
+    bool found = ( kv_list.find(key) != kv_list.end()); 
+    if(found){
+	KVMapList::iterator values_list = kv_list.find(key);
+	vector<string>::iterator it = values_list->second.begin();
+	for(	 ;       it != values_list->second.end();){
+	    if( *it == value ){
+#ifdef DEBUG_KV
+		cout<<"[KV] !!!!!**********delete----> "<< *it<<endl;
+#endif
+		values_list->second.erase(it);
+	    }
+	    else{
+		it++;
+	    }
 #ifdef DEBUG_KV
 	    cout<< (*it)<<" ";
 #endif
-	       	
-	    }
-
-#ifdef DEBUG_KV
-	cout<<endl
-#endif
-	    /*
-	else {
-
 	}
     }
-    else return KVStoreStatus::EITEMNOTFOUND;
-    */
+    else  {
+#ifdef DEBUG_KV
+	cout<<"[KV] Not Found "<<endl;
+#endif
 
-    return KVStoreStatus::OK;
-  }
+    }
+
+}
 
   private:
     int _id;
@@ -157,6 +554,8 @@ class KeyValueStoreHandler : virtual public KeyValueStoreIf {
     // the storage for Key and Value
     KVMap kv_store;
     KVMapList kv_list;
+
+    vector <string> vec_timestamp;
 
 
 

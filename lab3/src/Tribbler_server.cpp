@@ -14,6 +14,16 @@
 #include <thrift/transport/TBufferTransports.h>
 
 #include <map>
+// added by me
+#include <boost/lexical_cast.hpp>
+#include <sstream>
+#include <boost/property_tree/ptree.hpp>
+#include <boost/property_tree/json_parser.hpp>
+#include <boost/uuid/sha1.hpp>
+#include <algorithm>
+#include <sys/time.h>
+//
+
 
 using namespace ::apache::thrift;
 using namespace ::apache::thrift::protocol;
@@ -22,10 +32,22 @@ using namespace ::apache::thrift::server;
 
 using boost::shared_ptr;
 
+// add by me
+using boost::lexical_cast;
+using boost::property_tree::ptree; 
+using boost::property_tree::read_json; 
+using boost::property_tree::write_json;
+//
+
+
+
+
 using namespace std;
 using namespace  ::Tribbler;
 using namespace  ::KeyValueStore;
 #define DEBUG_TS
+
+static int message_memory = 100;
 
 class TribblerHandler : virtual public TribblerIf {
  public:
@@ -36,6 +58,16 @@ class TribblerHandler : virtual public TribblerIf {
     _kvServerPort = kvServerPort;
   }
 
+// from lab2
+    static bool compareTribbleFunc(const Tribbler::Tribble & a, const  Tribbler::Tribble & b){
+	return (a.posted > b.posted); 
+    }
+    static bool compareTribbleFuncRev(const Tribbler::Tribble & a, const  Tribbler::Tribble & b){
+	return (a.posted < b.posted); 
+    }
+    //from lab2
+ 
+
   TribbleStatus::type CreateUser(const std::string& userid) {
     // Your implementation goes here
     printf("CreateUser\n");
@@ -45,49 +77,752 @@ class TribblerHandler : virtual public TribblerIf {
     {
 	return TribbleStatus::EEXISTS ;
     }
-
     string uID = userid;
     string tweets_num = "0";   
     Put(userid,tweets_num);
+    AddToList("user_list",userid);
     return TribbleStatus::OK;
   }
+
 
   TribbleStatus::type AddSubscription(const std::string& userid, const std::string& subscribeto) {
     // Your implementation goes here
     printf("AddSubscription\n");
-    return TribbleStatus::NOT_IMPLEMENTED;
+    if ( userid == subscribeto){
+	printf("Really? You subscribe yourself?");
+//	return TribbleStatus::EEXISTS;
+    }
+    KeyValueStore::GetResponse validate_id = Get(userid);
+#ifdef DEBUG_TS
+    printf("Validate the user  %d\n",validate_id.status);
+#endif
+    if( validate_id.status == KVStoreStatus::EKEYNOTFOUND  )
+	return TribbleStatus::INVALID_USER;
+    // is there the user existed?
+    // verify the id is in the USER_LIST or not
+    //    string user_list = "USER_LIST";
+    // KeyValueStore::GetListResponse
+    validate_id = Get(subscribeto);
+#ifdef DEBUG_TS
+    printf("Validate the subscribeto  %d\n",validate_id.status);
+#endif
+    // printf("Validate the subscrito %d\n",validate_id.status);
+    if( validate_id.status == KVStoreStatus::EKEYNOTFOUND  )
+	return TribbleStatus::INVALID_SUBSCRIBETO;
+
+
+    string userid_subs = userid +":subscriptions";
+
+    KeyValueStore::GetListResponse subs = GetList(userid_subs);
+    
+#ifdef DEBUG_TS
+    cout<<"+++++++++++++++++++"<<endl;
+#endif
+
+
+    if(  subs.status != KVStoreStatus::EKEYNOTFOUND){
+	if ( (subs.values).size()>0 ){ 
+#ifdef DEBUG_TS
+	    printf("Validate the the list size=   %d\n", (int ) (subs.values).size() );
+	    cout<<"To find: "<<userid_subs<<endl;
+#endif
+	    for( vector<string>::iterator it = (subs.values).begin(); 
+		 it !=(subs.values).end(); it++ )
+	    {
+#ifdef DEBUG_TS
+		cout<<*it<<endl;
+#endif
+		if( *it == subscribeto){
+		    return TribbleStatus::EEXISTS;
+		}	    
+	    }
+	}
+    }
+
+#ifdef DEBUG_TS
+    cout<<"+++++++++++++++++++"<<endl;
+    cout<<"+++++++++++++++++++"<<endl;
+#endif
+
+    KVStoreStatus::type st =  AddToList(userid_subs, subscribeto);
+    if (st == KVStoreStatus::EPUTFAILED)
+	return TribbleStatus::STORE_FAILED; 
+
+
+    return TribbleStatus::OK;
+ 
+//    return TribbleStatus::NOT_IMPLEMENTED;
   }
 
   TribbleStatus::type RemoveSubscription(const std::string& userid, const std::string& subscribeto) {
     // Your implementation goes here
     printf("RemoveSubscription\n");
-    return TribbleStatus::NOT_IMPLEMENTED;
+
+    KeyValueStore::GetResponse validate_id = Get(userid);
+    // printf("Validate the user  %d\n",validate_id.status);
+    if( validate_id.status == KVStoreStatus::EKEYNOTFOUND  )
+	return TribbleStatus::INVALID_USER;
+
+    validate_id = Get(subscribeto);
+    // printf("Validate the user  %d\n",validate_id.status);
+    if( validate_id.status == KVStoreStatus::EKEYNOTFOUND  )
+	return TribbleStatus::INVALID_USER;
+
+    string userid_subs = userid+":subscriptions";
+    //    KVStoreStatus s
+    KVStoreStatus::type rmst  = RemoveFromList(userid_subs, subscribeto);
+    if(rmst == KVStoreStatus::EITEMNOTFOUND)
+	return TribbleStatus::INVALID_USER;
+
+    return TribbleStatus::OK;
+    
+//    return TribbleStatus::NOT_IMPLEMENTED;
   }
 
   TribbleStatus::type PostTribble(const std::string& userid, const std::string& tribbleContents) {
     // Your implementation goes here
     printf("PostTribble\n");
-    return TribbleStatus::NOT_IMPLEMENTED;
+    KeyValueStore::GetResponse validate_id = Get(userid);
+    // printf("Validate the user  %d\n",validate_id.status);
+    if( validate_id.status == KVStoreStatus::EKEYNOTFOUND  )
+    {
+	printf("Not found the userid");
+	return TribbleStatus::INVALID_USER;
+    }
+
+    // trib posted = timestamp
+    // trib contents
+    // json trib => jsonstr
+    // hash str => hashstr
+    // add index to user's tribindex (userid:tribindex)
+    // add tribble to hashtable (userid:hashstr,jsonstr)
+
+    // string user_tribbles = userid+":tribble";
+      string grp_no = validate_id.value ;// 
+  //  string user_tribbles = userid+":tribble"+grp_no;
+   // string timestamp = boost::lexical_cast<string> (time(NULL)); 
+   // string time_tribble = timestamp+":"+tribbleContents ;
+
+    ptree pt; 
+    
+
+    timespec ts;
+    // clock_gettime(CLOCK_MONOTONIC, &ts); // Works on FreeBSD
+    clock_gettime(CLOCK_REALTIME, &ts); // Works on Linux
+    // cout<<ts.tv_nsec;
+
+    pt.put("user_id", userid);
+    pt.put("time_stamp", boost::lexical_cast<string> (ts.tv_sec * 1000000000 + ts.tv_nsec) );
+    pt.put("tribble", tribbleContents);
+//    write_json("tribble.json",pt);
+//    string marshal_tribble="";
+    std::stringstream marshal_tribble_tmp;
+    write_json(marshal_tribble_tmp,pt);
+    string marshal_tribble = marshal_tribble_tmp.str();
+    
+//    printf("tribble in json %s\n", marshal_tribble.c_str());
+
+    // for hash function just like Git, do not treat it as security protection 
+    // it is tweeting ... not password .
+    boost::uuids::detail::sha1 hash_sha1 ;
+    // hash_sha1.process_bytes(marshal_tribble.c_str(),marshal_tribble.size());
+    string hash_trib =  Sha1sum(marshal_tribble.c_str(),marshal_tribble.size());
+
+ //   printf("hashing tribble in json %s\n",hash_trib.c_str());
+
+    int cur_msg =  boost::lexical_cast<int> (validate_id.value);
+    cur_msg++;
+//     validate_id = Get(userid) ;
+  //  cout<<validate_id.value<<endl;
+//    int tweet_num = boost::lexical_cast<int>( validate_id.value);
+ //   tweet_num++;
+    KVStoreStatus::type put_st =  Put(userid,boost::lexical_cast<string>(cur_msg) );
+    if(put_st == KVStoreStatus::EPUTFAILED)
+    {
+	printf("Cannot put the message to the userid list!!\n");
+	return TribbleStatus::STORE_FAILED; 
+    }
+
+    int group = (cur_msg-1) / message_memory;
+    string str_group = ":"+boost::lexical_cast<string>(group);
+    string user_trib_index = userid+":trib_index"+str_group;
+
+    // printf("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
+    // cout<<"add to ---> "<< user_trib_index<<endl;
+//    printf("before update tweets number: %d\n", boost::lexical_cast<int> (validate_id.value));
+     //// validate_id = Get(userid) ;
+    // cout<<validate_id.value<<endl;
+
+    // printf("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
+    /*
+
+    int64_t tweets_num = boost::lexical_cast<int64_t>( validate_id.value) ;
+    printf("before update tweets number: %d\n", (int) tweets_num );
+    tweets_num++;
+    stringstream tn;
+    tn <<tweets_num;
+    Put(userid,tn.str()) ;
+    validate_id = Get(userid);
+    printf("after update tweets number: %s\n",((validate_id.value)).c_str() );
+    */
+  //  printf("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
+    AddToList(user_trib_index , hash_trib);
+    string user_hashtrib = userid+hash_trib;
+    KVStoreStatus::type uhres = Put(user_hashtrib, marshal_tribble); // record the real tweets
+    if( uhres == KVStoreStatus::EPUTFAILED )
+    {
+	printf("Cannot put the message to trible list to %s!\n", userid.c_str() );
+	return TribbleStatus::STORE_FAILED;
+    }
+
+  //  printf("Put the trib in KV. The status: %d\n", uhres);
+
+/*
+    KVStoreStatus::type st = AddToList(user_tribbles, time_tribble);
+    printf("Post status %d\n",st);
+    if(st == KVStoreStatus::OK){
+	printf("%s just post %s\n",user_tribbles.c_str(), tribbleContents.c_str());
+    }
+    // propagate to the people subscribe `me`
+    string befriended = userid + ":befriended"; 
+    KeyValueStore::GetListResponse res =  GetList(befriended);
+    vector<string> bef = res.values;
+    string key ;
+    KVStoreStatus::type st_prop ;
+    string time_tribble_tmp;
+    for(vector<string>::iterator it = bef.begin(); it != bef.end(); it++){
+       key = (*it)+":friends_tweets" ;	
+       time_tribble_tmp = userid+":"+time_tribble;
+       st_prop = AddToList(key,time_tribble_tmp); 
+       printf("\" %s \" from me and propagate to %s. Return the state %d\n", time_tribble_tmp.c_str() , key.c_str(), st_prop);
+    }
+    */
+    return TribbleStatus::OK;
+
+
+//    return TribbleStatus::NOT_IMPLEMENTED;
+
   }
 
   void GetTribbles(TribbleResponse& _return, const std::string& userid) {
     // Your implementation goes here
-    _return.status = TribbleStatus::NOT_IMPLEMENTED;
-    printf("GetTribbles\n");
+
+
+
+      printf("GetTribbles\n");
+      // Your implementation goes here
+      // printf("---------------------------------\n");
+      // printf("---------------------------------\n");
+      // printf("---------------------------------\n");
+      // printf("---------------------------------\n");
+      // printf("---------------------------------\n");
+      // printf("---------------------------------\n");
+      
+ 
+      // get userid:tribindex => list
+      // get userid:list(i) =>  jsontrib 
+      // unmashal(jsontrib) => trib 
+
+      KeyValueStore::GetResponse validate_id = Get(userid);
+      // printf("Validate the user  %d\n",validate_id.status);
+      if( validate_id.status == KVStoreStatus::EKEYNOTFOUND  )
+      {
+	  printf("The user '%s' doesnot exist",userid.c_str());
+	  _return.status = TribbleStatus::INVALID_USER;
+	  return ;
+      }
+
+      _return.status = TribbleStatus::OK;
+
+      int cur_message = boost::lexical_cast<int> (validate_id.value);
+      int cur_group = (cur_message-1) / message_memory; 
+      int cnt = 0;
+
+      while(cnt < 100 && cur_group >= 0  ){
+	  string group = ":"+lexical_cast<string> (cur_group);
+//	  string group ="";
+	  string user_trib_index = userid+":trib_index"+group;
+	  // cout<<"in the group ---> "<<user_trib_index<<endl;
+	  // Get My tweets/tribbles' index
+	  KeyValueStore::GetListResponse index = GetList(user_trib_index);
+	  if( index.status == KVStoreStatus::EKEYNOTFOUND)
+	  {
+	      printf("No found the trib index page!\n");
+	      // _return.status = TribbleStatus::INVALID_SUBSCRIBETO;
+	      cur_group--;
+	      return ;  
+	  }
+	  //    string uID = userid + ":tribble"; 
+	  //   KeyValueStore::GetListResponse res = GetList(uID);
+	  vector<string> get_t_list = index.values;
+	  //  size_t sz = get_t_list.size();
+	  //     for( size_t i = sz-1; i >= 0 ; i--   )
+	  string tmp = "";
+	  ptree trib;
+	  //    stringstream trib = ""; 
+	  string tribstr ="";
+	  KeyValueStore::GetResponse ind ; 
+	  Tribbler::Tribble tmptrib_class;
+	  if(get_t_list.size()>0){
+	      // printf("the index size = %d\n",(int)get_t_list.size());
+	      // printf("%s\n", (get_t_list[0]).c_str());
+	      // some boundary concerns 
+	      for(vector<string>::iterator it = get_t_list.end()-1; it != get_t_list.begin()-1; it--)
+	      {
+		  tmp = userid+(*it);
+		  // printf("username and index = %s\n",tmp.c_str()/*,tmp.c_str()*/);
+		  ind = Get(tmp);
+#ifdef DEBUG_TS
+		  cout<<"Tweets target index: "<<tmp<<endl;
+#endif 
+		  if(ind.status != KVStoreStatus::EITEMEXISTS){
+		      printf("Not tweets found!!\n");
+		  }
+		  stringstream tribss(ind.value);
+		  read_json(tribss,trib);
+		  // printf("Readin the trib from json %s\n",(ind.value).c_str());
+		  tribstr = trib.get<string>("tribble");
+		  tmptrib_class.contents = tribstr;
+		  tmptrib_class.userid = trib.get<string>("user_id");
+	//	  tmptrib_class.posted = trib.get<int64_t>("time_stamp");
+		  // insert a binarry tree 
+		  // remove the push back here
+		  (_return.tribbles).push_back(tmptrib_class);
+		  sort( (_return.tribbles).begin(), (_return.tribbles).end(), compareTribbleFunc);
+		  cnt++;
+		  if ( cnt == 100 ) { 
+		      // build into return.tribbles use push_back
+		      _return.status = TribbleStatus::OK;
+		      return ;
+		  }
+	      }
+	      // build into return.tribbles use push_back
+//	      _return.status = TribbleStatus::OK;
+	  }
+	  else{
+	      _return.status = TribbleStatus::OK;
+	      return ;// 
+	  }
+	  cur_group--;
+	  _return.status = TribbleStatus::OK;
+      }
+      // while
+
+
   }
 
   void GetTribblesBySubscription(TribbleResponse& _return, const std::string& userid) {
     // Your implementation goes here
-    _return.status = TribbleStatus::NOT_IMPLEMENTED;
-    printf("GetTribblesBySubscription\n");
+      //printf("---------------------------------\n");
+      //printf("---------------------------------\n");
+     // printf("---------------------------------\n");
+      printf("GetTribblesBySubscription\n");
+      // printf("---------------------------------\n");
+      // printf("---------------------------------\n");
+      // initilizaion the subscriptions 
+      // get userid -> verify the user
+      // getlist(userid:subscriptions) => list_sub_string
+      // getlist(list_sub_string(i):tribindex) => list_sub_string(i).Indices 
+
+      KeyValueStore::GetResponse validate_id = Get(userid);
+      // printf("Validate the user  %d\n",validate_id.status);
+      if( validate_id.status == KVStoreStatus::EKEYNOTFOUND  )
+      {
+	  _return.status = TribbleStatus::INVALID_USER;
+	  return ;//TribbleStatus::INVALID_USER;
+      }
+      string userid_subs = userid+":subscriptions";
+
+      KeyValueStore::GetListResponse  subs_string = GetList(userid_subs); 
+      // the subscriptions list
+      vector<string> subs = subs_string.values;
+      vector< vector<string> > subs_indices ;  
+    //   vector<size_t> subs_index;  
+      vector<int> subs_index;  
+      vector<int> subs_msg;  
+      vector<int> subs_cur_group;  
+      vector<string> subs_userid;  
+      Tribbler::Tribble tmptrib_class;
+      vector< Tribbler::Tribble > subs_current_trib;
+//      vector< Tribbler::Tribble > friend_cur_trib;
+      vector< vector< Tribbler::Tribble > >  friends_arrays;
+
+      friends_arrays.resize( subs.size());
+
+      // tmp trib
+      ptree trib;
+
+      int flag = 0;
+      string uidx ="";
+      KeyValueStore::GetListResponse tmp_indices; //  GetList(user_trib_index);
+      KeyValueStore::GetResponse trib_marsh; //  GetList(user_trib_index);
+      
+//      vector< vector<string> >::iterator it_ind = subs_indices.begin();  
+      for(vector<string>::iterator it = subs.begin();it != subs.end(); it++){
+	  validate_id = Get(*it);
+	  int tmp_num = boost::lexical_cast<int> (validate_id.value); 
+#ifdef DEBUG_TS
+	  cout<<"FETCH the msg for "<< (*it) <<"   ---> "<< validate_id.value<<endl;
+#endif
+	  subs_msg.push_back(tmp_num );
+	  subs_cur_group.push_back( (tmp_num-1)/ message_memory  );
+	  // uidx = (*it)+":trib_index";
+	 if( tmp_num < 0 ){
+	     //  (friends_arrays[flag]).resize(subs_index[flag]+1);
+	     subs_userid.push_back(*it);
+	     subs_index.push_back(-1);
+	     vector<string> tmpv;
+	     tmpv.resize(0);
+	     subs_indices.push_back(tmpv);
+	     friends_arrays[flag].resize(0);
+	     tmptrib_class.contents ="";// trib.get<string>("tribble");
+	     // 	      printf("tmptrib contents %s\n", (tmptrib_class.contents).c_str());
+	     tmptrib_class.userid =(*it) ;// trib.get<string>("user_id");
+//	     tmptrib_class.posted = 0 ;// trib.get<int64_t>("time_stamp");
+	     subs_current_trib.push_back(tmptrib_class); 
+	 }
+	 else {
+	     uidx = (*it)+":trib_index"+":"+(boost::lexical_cast<string>(subs_cur_group[flag]));
+	     // can tag the current number and transfer smaller index for subs
+#ifdef DEBUG_TS
+	 printf("%d The subs people = %s\n", flag, uidx.c_str());
+#endif
+	      tmp_indices    = GetList(uidx ); 
+	      subs_userid.push_back(*it);
+
+	      vector<string> tmp_ind = tmp_indices.values; 
+	      subs_index.push_back(tmp_ind.size()-1);
+
+	      // printf("%d\n",(int) tmp_ind.size()); 
+	      // the real infomation are stored in the indices contains time stamp, id, tweets 
+	      subs_indices.push_back(tmp_ind);
+	      // --- 
+	      // fetch in the group tweets for one friend
+	      string uid_tmp=""; 
+	      // get the current list for this firend
+	      (friends_arrays[flag]).resize(subs_index[flag]+1);
+	      for(int jj = 0; jj < subs_index[flag] + 1 ; jj++){
+		  uid_tmp = subs_userid[flag] + (subs_indices[flag])[ jj ];
+		  //	      printf("uid_tmp = %s\n", uid_tmp.c_str());
+		  trib_marsh = Get( uid_tmp );
+
+
+		  if(trib_marsh.status == KVStoreStatus::EKEYNOTFOUND)
+		  {
+		      printf("Package loss!\n"); 
+		      tmptrib_class.contents = "";//trib.get<string>("tribble");
+		      // 	      printf("tmptrib contents %s\n", (tmptrib_class.contents).c_str());
+		      tmptrib_class.userid = "";//trib.get<string>("user_id");
+//		      tmptrib_class.posted = 0;// trib.get<int64_t>("time_stamp");
+
+		  }
+		  else{
+		      // printf("get the %s\n", (trib_marsh.value).c_str() );
+		      stringstream  tmp_msh(trib_marsh.value);
+		      //	      printf("Read to sort %s    " , (tmp_msh.str()).c_str());
+		      read_json(tmp_msh, trib);
+		      tmptrib_class.contents = trib.get<string>("tribble");
+		      // 	      printf("tmptrib contents %s\n", (tmptrib_class.contents).c_str());
+		      tmptrib_class.userid = trib.get<string>("user_id");
+//		      tmptrib_class.posted = trib.get<int64_t>("time_stamp");
+
+		      (friends_arrays[flag])[jj]=tmptrib_class;// subs_index[flag]+1);
+		  }
+		  //	      friend_cur_trib.push_back(tmptrib_class);
+		  // (friends_arrays[flag]).push_back(tmptrib_class);
+	      }
+	      //	  printf("current clas s size %d",(int) friend_cur_trib.size());
+
+	      //	  friends_arrays.push_back(friend_cur_trib);
+
+
+	      //	  printf("before sorting ?!@!@#@!# %d,    ", (int) (friends_arrays[flag]).size() ); 
+	      // for(vector<Tribble>::iterator fit = (friends_arrays[flag]).begin();
+	      //  fit != (friends_arrays[flag]).end(); fit++){
+	      // }
+	      sort( (friends_arrays[flag]).begin(), 
+		    (friends_arrays[flag]).end(), compareTribbleFuncRev);
+	  }
+
+	  /*
+	     printf("after sorting ?!@!@#@!# %d\n  ", (int) (friends_arrays[flag]).size() ); 
+
+	  for(vector<Tribble>::iterator fit = (friends_arrays[flag]).begin();
+	      fit != (friends_arrays[flag]).end(); fit++){
+	      printf("?!@!@#@!# timestamp = %d, ", (int) ((*fit).posted) ); 
+	      printf("?!@!@#@!# content = %s\n", ((*fit).contents).c_str() ); 
+	  }
+	  */
+// --- 
+
+
+	  //	  (subs_indices[i]).insert( (subs_indices[i]).begin(), tmp_ind.begin(), tmp_ind.end());
+//	  (*it_ind)=(tmp_ind);
+
+/*	  printf("before sort\n");
+	  for( vector<string>::iterator itt = (subs_indices[flag]).begin(); itt!= (subs_indices[flag]).end(); itt++  ){
+	      printf("%s  ", (*itt).c_str());
+	  }
+	  printf("\n");
+	  printf("\n");
+	  printf("begin rearrange !! \n");
+
+	  sort( (subs_indices[flag]).begin(), (subs_indices[flag]).end(),compareIndices);
+	  for( vector<string>::iterator itt = (subs_indices[flag]).begin(); itt!= (subs_indices[flag]).end(); itt++  ){
+	      printf("%s  ", (*itt).c_str());
+	  }
+
+	  printf("after  sort\n");
+	  printf("\n");
+ */
+	  // printf("subs_indices's size = %d\n",(int)  (subs_indices).size()); 
+	  // printf("current element of subs_indices's size = %d\n",(int)  (subs_indices[flag]).size()); 
+	 // printf("\n\n");
+
+	  // initized the friends
+	  // add non empty tribbers from friends
+	  if(subs_index[flag] >= 0 ){
+	  //    printf("subs_index[flag] = %d\n", (int) subs_index[flag]);
+	      
+	      // reduce the index to get the last element
+
+	      //	      string uid_tmp = subs_userid[flag] + (subs_indices[flag])[ subs_index[flag] ];
+	      //	      printf("uid_tmp = %s\n", uid_tmp.c_str());
+	      //	      trib_marsh = Get( uid_tmp );
+	      // printf("get the %s\n", (trib_marsh.value).c_str() );
+	      //	      stringstream tmp_msh(trib_marsh.value);
+	      //	      read_json(tmp_msh, trib);
+	      //printf("????????????????????????????????????????The friends array size %d and subs_index is %d,   ", 
+	      //     (int ) (friends_arrays[flag]).size(), (int) subs_index[flag]);
+	      //  printf("!~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ ~~~~ \n\n %s ",
+	      //  ( (( friends_arrays[flag]).at(subs_index[flag])).contents).c_str());
+	      tmptrib_class.contents = (( friends_arrays[flag]).at(subs_index[flag])).contents;
+	      // trib.get<string>("tribble");
+	      //      printf("tmptrib contents %s\n", (tmptrib_class.contents).c_str());
+	      tmptrib_class.userid =( (friends_arrays[flag]).at(subs_index[flag])).userid ;
+	      // trib.get<string>("user_id");
+//	      tmptrib_class.posted =( (friends_arrays[flag]).at(subs_index[flag])).posted  ;
+	      // trib.get<int64_t>("time_stamp");
+	      subs_current_trib.push_back(tmptrib_class);
+	      //	      tmptrib_class =l/
+	      //	       subs_current_trib.push_back(friends_arrays[flag])[ subs_index[flag] ];
+
+	      //	      printf("tmptrib contents after getting !! %s\n", 
+	      //		     (subs_current_trib[flag].contents).c_str());
+	      //	      subs_index[flag]-- ;
+	      //	      printf("after reduce subs_index[flag] = %d\n",(int) subs_index[flag]);
+
+	  }// 
+
+	  // subs_index[flag]--;
+	  // clean the node index by reduce the position
+	  // need to reduce all, otherwise 0->-1, and -1->-1
+	  flag++;
+      }
+
+      //compare the current subscrip and find out the current latest, and iteration till 100
+      //      printf("The Flag final value = %d !!!!!!!!!!!!!!!!!!!!\n",flag);
+
+      int cnt_subs_trib = 100; 
+      int min_int  = -1;
+      // the current minimum position in friends 
+      // -1 means begin the scan
+
+      
+      for(int i = 0 ; i < cnt_subs_trib ; i++){
+	  min_int  = -1;
+	  for (int j = 0; j<flag ; j++){
+	      //	      printf("subs_index[%d]=%d    ", j,subs_index[j]);
+	      if( ( min_int == -1 && subs_index[j] > -1 ) 
+		  || (   min_int > -1 &&  subs_index[j] > -1  
+		//	&& (subs_current_trib[j].posted > subs_current_trib[min_int].posted )
+			) )
+	      {
+		  min_int = j;
+
+	      }
+	      /*
+	      if(subs_index[j]>-1)
+	      {
+
+	      cout<<j<<"'s "<<subs_current_trib[j].userid<<" timestamp: "<<
+		  subs_current_trib[j].posted<<" current group = "<<subs_cur_group[j]<<
+		  " current sub_index ="<<subs_index[j]<<endl; 
+	      }
+	      */
+ //   cout<<min_int<<"'s "<<subs_current_trib[min_int].userid<<
+//		  " time stamp"<<subs_current_trib[min_int].posted <<endl; 
+	
+	  } // for j
+	  // 	  printf("\n the min_int in iteration #%d is %d\n ",i, min_int);	
+//	  printf("------------ The winner is %d\n %d\n",min_int,(-1/50));
+
+	  if(min_int > -1) {
+	      (_return.tribbles).push_back(subs_current_trib[min_int]);
+	      subs_index[min_int]--;
+
+	      if(subs_index[min_int] <= -1 && subs_cur_group[min_int] > 0     )
+	      {
+		  subs_cur_group[min_int]--; 
+		  // update this friend with previous page index 
+		  uidx = subs[min_int] +":trib_index"+":"+(boost::lexical_cast<string>(subs_cur_group[min_int]));
+		  // can tag the current number and transfer smaller index for subs
+		  // printf("%d The subs people = %s\n", flag, uidx.c_str());
+		  tmp_indices  = GetList(uidx); 
+
+
+		  if(tmp_indices.status == KVStoreStatus::EKEYNOTFOUND)
+		  {
+		      printf("Package loss!\n"); 
+
+		  }
+		  vector<string> tmp_ind = tmp_indices.values; 
+		  subs_index[min_int] = (tmp_ind.size()-1);
+		  //  printf("%d\n",(int) tmp_ind.size()); 
+		  // the real infomation are stored in the indices contains time stamp, id, tweets 
+		  subs_indices[min_int] = (tmp_ind);
+		  // --- 
+		  // fetch in the group tweets for one friend
+		  string uid_tmp=""; 
+		  // get the current list for this firend
+		  friends_arrays[min_int].resize(subs_index[min_int]+1  );
+
+		  for(int jj = 0; jj < subs_index[min_int] + 1 ; jj++){
+		      uid_tmp = subs_userid[min_int] + (subs_indices[min_int])[ jj ];
+		      //printf("uid_tmp = %s\n", uid_tmp.c_str());
+		      trib_marsh = Get( uid_tmp );
+		      // printf("get the %s\n", (trib_marsh.value).c_str() );
+		      stringstream  tmp_msh(trib_marsh.value);
+		      //    printf("Read to sort %s    " , (tmp_msh.str()).c_str());
+		      read_json(tmp_msh, trib);
+		      tmptrib_class.contents = trib.get<string>("tribble");
+		      // printf("tmptrib contents %s\n", (tmptrib_class.contents).c_str());
+		      tmptrib_class.userid = trib.get<string>("user_id");
+//		      tmptrib_class.posted = trib.get<int64_t>("time_stamp");
+		      // friend_cur_trib.push_back(tmptrib_class);
+		      // (friends_arrays[min_int]).push_back(tmptrib_class);
+		      (friends_arrays[min_int])[jj]= tmptrib_class ;
+		  }
+
+		  //		  printf("current clas s size %d",(int) friend_cur_trib.size());
+
+		  // friends_arrays[min_int]=friend_cur_trib;
+		  //		  printf("before sorting ?!@!@#@!# %d,    ", (int) (friends_arrays[flag]).size() ); 
+		  // for(vector<Tribble>::iterator fit = (friends_arrays[flag]).begin();
+		  //  fit != (friends_arrays[flag]).end(); fit++){
+		  // }
+
+		  sort( (friends_arrays[min_int]).begin(),
+			(friends_arrays[min_int]).end(), compareTribbleFuncRev);
+
+		  /*
+		  tmptrib_class.contents =
+		      (( friends_arrays[min_int]).at(subs_index[min_int])).contents;
+		  // trib.get<string>("tribble");
+		  //      printf("tmptrib contents %s\n", (tmptrib_class.contents).c_str());
+		  tmptrib_class.userid =
+		      ( (friends_arrays[min_int]).at(subs_index[min_int])).userid ;
+		  // trib.get<string>("user_id");
+		  tmptrib_class.posted =
+		      ( (friends_arrays[min_int]).at(subs_index[min_int])).posted  ;
+		  // trib.get<int64_t>("time_stamp");
+		  subs_current_trib[min_int] = (tmptrib_class);
+		  */
+
+	      }
+	      // next update the min_int  after pop out 
+
+	      if(subs_index[min_int] > -1       )
+	      { // current index > -1 means there still exist tribbles
+		 //  string uid_tmp = subs_userid[min_int] + (subs_indices[min_int])[ subs_index[min_int] ];
+		  
+		  //		  trib_marsh = Get( uid_tmp );
+		  //		  stringstream tmp_msh(trib_marsh.value);
+		  //		  read_json(tmp_msh, trib);
+		  //		  tmptrib_class.contents = trib.get<string>("tribble");
+		  //		  printf("tmptrib contents %s\n", (tmptrib_class.contents).c_str());
+		  //		  tmptrib_class.userid = trib.get<string>("user_id");
+		  //  tmptrib_class.posted =  ;// trib.get<int64_t>("time_stamp");
+		  tmptrib_class.contents = 
+		      (( friends_arrays[min_int]).at(subs_index[min_int])).contents;
+		  // trib.get<string>("tribble");
+		  //     printf("tmptrib contents %s\n", (tmptrib_class.contents).c_str());
+		  tmptrib_class.userid =( (friends_arrays[min_int]).at(subs_index[min_int])).userid ;
+		  // trib.get<string>("user_id");
+//		  tmptrib_class.posted =( (friends_arrays[min_int]).at(subs_index[min_int])).posted  ;
+		  // trib.get<int64_t>("time_stamp");
+		  subs_current_trib[min_int] = tmptrib_class;
+	      }
+	  }
+	  else {
+	      _return.status = TribbleStatus::OK;
+	      //    sort( (_return.tribbles).begin(), (_return.tribbles).end(), compareTribbleFunc);
+	      return;
+	  }
+      }
+      _return.status = TribbleStatus::OK;
+      //      sort( (_return.tribbles).begin(), (_return.tribbles).end(), compareTribbleFunc);
+/*
+      string user_get_friends = userid + ":friends_tweets" ;	
+      printf("fetch %s\n", user_get_friends.c_str());
+      KeyValueStore::GetListResponse res = GetList(user_get_friends);
+      vector<string> get_t_list = res.values;
+      printf("Getlist Response Status: %d ; Tribble size : %d \n",res.status, (int)get_t_list.size());
+      //    vector<Tribble> t_list ;
+      Tribbler::Tribble t_list_node;
+      for(vector<string>::iterator it = get_t_list.begin(); it != get_t_list.end(); ++it)
+      {
+	  t_list_node.contents = *it ;// it;
+	  (_return.tribbles).push_back(t_list_node);
+      }
+      //     _return.tribbles = t_list;
+      // _return.status = TribbleStatus::NOT_IMPLEMENTED;
+
+      //    _return.status = TribbleStatus::NOT_IMPLEMENTED;
+      */
+#ifdef DEBUG_TS
+      cout<<"At the end of GetTribblesBySubscription"<<endl;
+#endif
   }
 
   void GetSubscriptions(SubscriptionResponse& _return, const std::string& userid) {
     // Your implementation goes here
-    _return.status = TribbleStatus::NOT_IMPLEMENTED;
+//    _return.status = TribbleStatus::NOT_IMPLEMENTED;
     printf("GetSubscriptions\n");
+    KeyValueStore::GetResponse validate_id = Get(userid);
+    // printf("After Validation the status is %d\n",validate_id.status);
+    if( validate_id.status == KVStoreStatus::EKEYNOTFOUND  )
+    {
+	_return.status = TribbleStatus::INVALID_SUBSCRIBETO ;
+	return; //;TribbleStatus::INVALID_USER ;
+    }
+    string userid_subs = userid+":subscriptions";
+
+    KeyValueStore::GetListResponse res =  GetList(userid_subs);
+#ifdef DEBUG_TS
+     printf("After Getlist the status is %d\n",res.status);
+#endif
+    vector<string> get_t_list = res.values;
+
+#ifdef DEBUG_TS
+     printf("Subs list size: %d\n",(int)get_t_list.size());
+#endif
+    /*
+    for(vector<string>::iterator it = get_t_list.begin();
+	it != get_t_list.end(); ++it)
+    {
+	(_return.subscriptions).push_back(*it);
+    }
+    */
+
+    _return.subscriptions = res.values;
+    _return.status = TribbleStatus::OK;
+
   }
 
+
+
+ 
   // Functions from interacting with the kv RPC server
   KVStoreStatus::type AddToList(std::string key, std::string value) {
     boost::shared_ptr<TSocket> socket(new TSocket(_kvServer, _kvServerPort));
@@ -98,6 +833,9 @@ class TribblerHandler : virtual public TribblerIf {
     KVStoreStatus::type st;
     transport->open();
     string clientid("tribbleserver");
+#ifdef DEBUG_TS
+//    cout<<"Add to list in RPC"<<endl;
+#endif
     st = kv_client.AddToList(key, value, clientid);
     transport->close();
     return st;
@@ -156,6 +894,31 @@ class TribblerHandler : virtual public TribblerIf {
     transport->close();
     return response;
   }
+  // acknowledge github here  
+  // use SHA1 method via boost, and use this code to calculate the sum 
+  std::string Sha1sum(const void *data, std::size_t count) {
+      boost::uuids::detail::sha1 hasher;
+      char hash[20];
+      hasher.process_bytes(data, count);
+      unsigned int digest[5];
+      hasher.get_digest(digest);
+      for(int i = 0; i < 5; ++i) {
+	  const char *tmp = reinterpret_cast<char *>(digest);
+	  hash[i * 4] = tmp[i * 4 + 3];
+	  hash[i * 4 + 1] = tmp[i * 4 + 2];
+	  hash[i * 4 + 2] = tmp[i * 4 + 1];
+	  hash[i * 4 + 3] = tmp[i * 4];
+      }
+      std::stringstream res;
+      res << std::hex;
+      for(int i = 0; i < 20; ++i) {
+	  res << ((hash[i] & 0x000000F0) >> 4)
+	      <<  (hash[i] & 0x0000000F);
+      }
+      return res.str();
+  }
+
+
 
  private:
   std::string _kvServer;
@@ -182,3 +945,4 @@ int main(int argc, char **argv) {
   server.serve();
   return 0;
 }
+
