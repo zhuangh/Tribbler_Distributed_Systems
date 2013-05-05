@@ -37,7 +37,7 @@ using boost::property_tree::write_json;
 typedef boost::unordered_map<std::string, std::string > KVMap;
 typedef boost::unordered_map<std::string, std::vector<string> > KVMapList;
 
-#define DEBUG_KV
+// #define DEBUG_KV
 static int TIMEOUT_IN_MS = 100;
 
 class KeyValueStoreHandler : virtual public KeyValueStoreIf {
@@ -64,7 +64,6 @@ class KeyValueStoreHandler : virtual public KeyValueStoreIf {
 
 	try{
 	    boost::shared_ptr<TSocket> socket( new TSocket(peer_ip, peer_port) );
-
 
 	    boost::shared_ptr<TTransport> transport( new TBufferedTransport(socket));
 	    boost::shared_ptr<TProtocol> protocol(new TBinaryProtocol(transport));

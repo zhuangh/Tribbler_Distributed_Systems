@@ -45,7 +45,7 @@ using boost::property_tree::write_json;
 using namespace std;
 using namespace  ::Tribbler;
 using namespace  ::KeyValueStore;
-#define DEBUG_TS
+// #define DEBUG_TS
 
 static int message_memory = 100;
 
@@ -597,15 +597,15 @@ class TribblerHandler : virtual public TribblerIf {
 #endif 
 
 	      subs_current_trib.push_back(tmptrib_class);
+
+
+#ifdef DEBUG_TS
 	      vector<Tribble>::iterator tmpst =  subs_current_trib.end()-1;
 	      for(int bi = 1 ;  bi <= backend_num ; bi++ ) {
-#ifdef DEBUG_TS
-
 		  cout<< tmpst->userid  <<" time vector : "<<bi<<" = "<<((*tmpst).posted)[bi-1]<<endl;
-#endif
 		  // it_posted++; 
 	      }
-
+#endif
 	  }// 
 	  flag++;
       }

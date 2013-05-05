@@ -6,17 +6,21 @@ email: hazhuang@ucsd.edu
 ID account(sysnet): hazhuang
 Ph.D. Student, Computer Science Department, UC San Diego
 
+Please uses the head files contain "oneway" RPC. So I tar the whole code into the package (like lab2);
 
-Use vector timestamp to maintain the partial order. 
-By propogate the logical time step, each put will increase logical time stamp.
+Dribbler System Design Approaches:
 
-I choose [1] as the timestamp algorithm.
+*   Use vector timestamp to maintain the partial order. By propogate the logical time step, 
+    each put will increase logical time stamp. 
+    --	I choose [1] as the timestamp algorithm.
+    --	When a tribbler is posted from a tribbler server, who talks to KV Server #s_id, it 
+	will hit every server alive, so that make their local logical time stamp increasing.  
 
-When a tribbler is posted from a tribbler server, who talks to KV Server #s_id, it will hit every server alive, so that make their local logical time stamp increasing.  
+*   I choose not to display previous tribblers before a server joining the network. 
 
-I choose not to display previous tribblers before a server joining the network. 
-
-I constrain the ./kv_server id is consecutive, and increase 1 by 1, but the order joining network is not constrain.  
+*   I constraint "id" in the ./kv_server id is consecutive.
+    -- "id" starting from 1, not bigger than the server's number;
+    -- The order joining network is not constrain.  
 
 
 
